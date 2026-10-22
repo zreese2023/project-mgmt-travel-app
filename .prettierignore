@@ -1,0 +1,7 @@
+node_modules
+dist
+coverage
+package-lock.json
+# Hand-authored planning docs keep their own table layout.
+docs
+*.md

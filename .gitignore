@@ -8,3 +8,6 @@ coverage/
 *.tsbuildinfo
 .vite/
 .DS_Store
+project-docs.txt
+risks.md
+sprint-plan.md
