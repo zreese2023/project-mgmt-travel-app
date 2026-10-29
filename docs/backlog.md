@@ -130,7 +130,7 @@ Story IDs missing from the source numbering (SCRUM-16..20, SCRUM-28..30) are not
 | ID | Title | UC | Pts | Priority | Sprint | Status |
 | --- | --- | --- | --- | --- | --- | --- |
 | SCRUM-31 | Create Itinerary | UC-04 | 5 | Must | 1 | In Review |
-| SCRUM-32 | Edit itinerary (add/remove) | UC-04 | 2 | Must | 1 | In Review |
+| SCRUM-32 | Edit itinerary (add, edit, remove, move up/down) | UC-04 | 2 | Must | 1 | In Review |
 | SCRUM-34 | Manage Profile (Sprint 1: register, sign in and out only) | UC-10 | 5 | Must | 1 | In Review |
 | SCRUM-36 | Reorder itinerary: drag and drop + keyboard (**Derived**) | UC-04 | 5 | Must | 2 | To Do |
 | SCRUM-38 | Export itinerary to PDF (**Derived**) | UC-04 | 3 | Must | 2 | To Do |
@@ -231,3 +231,4 @@ Each needs your decision or a veto. "Proposed" is what I will implement if you a
 | 2026-10-22 | **PM descoped from Sprint 1:** booking and payment (SCRUM-22, 24, 25, 27), profile management, and notifications. Code, tests, schema tables and routes for them were removed from the build. Flights and hotels are search-and-select only ("Add to trip"). SCRUM-34 keeps register, sign in and sign out. The half-built advisory override and the admin demo account were removed with them. | PM direction: Sprint 1 is the ConOps 5.1 MVP only. |
 | 2026-10-22 | SCRUM-26, 33, 35, 37, 41, 43 (manage bookings, alerts, past trips, cancel, saved payment methods, advisory override) still depend on the removed booking and notification features and would need them rebuilt when scheduled. | Consequence of the descoping above. |
 | 2026-10-22 | **Second descoping pass, to match ConOps 5.1 exactly:** removed the travel advisory banner, API and seed data (SCRUM-15, not in the 5.1 list), itinerary item editing (5.1 says add or remove) and the trip rename/date-change API. Kept: accounts, destination search and filters and details, flight and hotel search with Add to trip, add/remove itinerary builder (plus create, list and delete trip), weather popup and panel. | PM pasted ConOps 5.1 as the Sprint 1 definition. |
+| 2026-10-29 | **PM approved SCRUM-32 (edit itinerary) and SCRUM-12 (filter destinations) for Sprint 1.** SCRUM-12 was never removed; it is in and covered by tests. SCRUM-32 now covers add, edit (title, day, time, notes), remove and rearrange with move up/down buttons within a day, which meets the story's "add, remove, or rearrange" criteria. Drag-and-drop reordering (SCRUM-36, ConOps 5.2) is still Sprint 2 and is not built. Trip rename and date changes are not built. | PM direction. |

@@ -31,6 +31,13 @@ const addErrors = ref<Record<string, string>>({});
 // Suggested activity form
 const suggestDay = ref('');
 
+// Inline edit
+const editingId = ref<number | null>(null);
+const editTitle = ref('');
+const editDay = ref('');
+const editTime = ref('');
+const editNotes = ref('');
+
 const tripDays = computed(() => detail.value?.days.filter((d) => d.dayNumber !== null) ?? []);
 
 async function load(): Promise<void> {
@@ -96,6 +103,40 @@ async function remove(item: ItineraryItem): Promise<void> {
   message.value = null;
   try {
     await endpoints.trips.removeItem(tripId.value, item.id);
+    await load();
+  } catch (err) {
+    message.value = { kind: 'error', text: errorMessage(err) };
+  }
+}
+
+function startEdit(item: ItineraryItem): void {
+  editingId.value = item.id;
+  editTitle.value = item.title;
+  editDay.value = item.day;
+  editTime.value = item.startTime ?? '';
+  editNotes.value = item.notes ?? '';
+}
+
+async function saveEdit(item: ItineraryItem): Promise<void> {
+  message.value = null;
+  try {
+    await endpoints.trips.updateItem(tripId.value, item.id, {
+      title: editTitle.value,
+      day: editDay.value,
+      startTime: editTime.value || null,
+      notes: editNotes.value || null,
+    });
+    editingId.value = null;
+    await load();
+  } catch (err) {
+    message.value = { kind: 'error', text: errorMessage(err) };
+  }
+}
+
+async function move(item: ItineraryItem, direction: 'up' | 'down'): Promise<void> {
+  message.value = null;
+  try {
+    await endpoints.trips.moveItem(tripId.value, item.id, direction);
     await load();
   } catch (err) {
     message.value = { kind: 'error', text: errorMessage(err) };
@@ -262,7 +303,7 @@ onMounted(load);
       <p v-if="day.items.length === 0" class="muted small">Nothing planned yet.</p>
       <ul v-else class="timeline">
         <li
-          v-for="item in day.items"
+          v-for="(item, index) in day.items"
           :key="item.id"
           class="timeline__item"
           data-testid="itinerary-item"
@@ -270,12 +311,54 @@ onMounted(load);
           <span class="timeline__time">{{
             item.startTime ? formatClock(item.startTime) : 'Anytime'
           }}</span>
-          <div>
+          <div v-if="editingId !== item.id">
             <span class="kind">{{ item.kind }}</span>
             <strong>{{ item.title }}</strong>
             <div v-if="item.notes" class="muted small">{{ item.notes }}</div>
           </div>
-          <div class="row">
+          <form v-else class="stack" @submit.prevent="saveEdit(item)">
+            <input v-model="editTitle" type="text" aria-label="Title" required />
+            <div class="row">
+              <select v-model="editDay" aria-label="Day" style="max-width: 14rem">
+                <option v-for="d in tripDays" :key="d.day" :value="d.day">
+                  Day {{ d.dayNumber }}: {{ formatDate(d.day) }}
+                </option>
+              </select>
+              <input v-model="editTime" type="time" aria-label="Time" style="max-width: 9rem" />
+            </div>
+            <input v-model="editNotes" type="text" aria-label="Notes" placeholder="Notes" />
+            <div class="row">
+              <button type="submit" class="primary button--small">Save</button>
+              <button type="button" class="button--small" @click="editingId = null">Cancel</button>
+            </div>
+          </form>
+          <div v-if="editingId !== item.id" class="row">
+            <button
+              type="button"
+              class="button--small"
+              :aria-label="`Move ${item.title} up`"
+              :disabled="index === 0"
+              @click="move(item, 'up')"
+            >
+              ↑
+            </button>
+            <button
+              type="button"
+              class="button--small"
+              :aria-label="`Move ${item.title} down`"
+              :disabled="index === day.items.length - 1"
+              @click="move(item, 'down')"
+            >
+              ↓
+            </button>
+            <button
+              type="button"
+              class="button--small"
+              :aria-label="`Edit ${item.title}`"
+              @click="startEdit(item)"
+            >
+              Edit
+            </button>
             <button
               type="button"
               class="button--small button--danger"

@@ -7,11 +7,13 @@ import {
   insertAt,
   insertionIndex,
   isHourMinute,
+  moveInOrder,
   summarizeTrip,
   toHourMinute,
   type DayPlan,
   type ItemKind,
   type ItineraryItem,
+  type MoveDirection,
   type TripSummary,
 } from './itinerary.js';
 import type pg from 'pg';
@@ -102,6 +104,13 @@ export function parseNewItem(body: NewItemBody): NewItemInput {
       };
     }
   }
+}
+
+export interface ItemPatch {
+  title?: string | undefined;
+  notes?: string | null | undefined;
+  day?: string | undefined;
+  startTime?: string | null | undefined;
 }
 
 interface TripRow {
@@ -450,6 +459,78 @@ export async function addItem(
     const { rows: fresh } = await db.query<ItemRow>(
       `select ${ITEM_COLUMNS} from itinerary_items where id = $1`,
       [created.id],
+    );
+    return toItem(fresh[0] as ItemRow);
+  });
+}
+
+/** Edits an item's title, notes, day or time; a changed day or time re-places it in the day. */
+export async function updateItem(
+  pool: pg.Pool,
+  userId: number,
+  tripId: number,
+  itemId: number,
+  patch: ItemPatch,
+): Promise<ItineraryItem> {
+  return withTransaction(pool, async (db) => {
+    const trip = await loadOwnedTrip(db, userId, tripId);
+    const { rows } = await db.query<ItemRow>(
+      `select ${ITEM_COLUMNS} from itinerary_items where id = $1 and trip_id = $2`,
+      [itemId, tripId],
+    );
+    const current = rows[0];
+    if (!current) throw notFound('Itinerary item');
+
+    const title = patch.title !== undefined ? patch.title.trim() : current.title;
+    if (!title) throw badRequest('Title is required', { title: 'Enter a title' });
+    const day = patch.day ?? current.day;
+    const startTime =
+      patch.startTime !== undefined ? patch.startTime : toHourMinute(current.start_time);
+    if (startTime !== null && !isHourMinute(startTime)) {
+      throw badRequest('Invalid time', { startTime: 'Use 24-hour HH:MM' });
+    }
+    if (patch.day !== undefined) assertWithinTrip(trip, day);
+    const notes = patch.notes !== undefined ? patch.notes : current.notes;
+
+    await db.query(
+      'update itinerary_items set title = $2, notes = $3, start_time = $4, day = $5::date where id = $1',
+      [itemId, title, notes, startTime, day],
+    );
+    const moved = day !== current.day || startTime !== toHourMinute(current.start_time);
+    if (moved) {
+      await placeInDay(db, tripId, itemId, day, startTime);
+      if (day !== current.day) await resequenceDay(db, tripId, current.day);
+    }
+    const { rows: fresh } = await db.query<ItemRow>(
+      `select ${ITEM_COLUMNS} from itinerary_items where id = $1`,
+      [itemId],
+    );
+    return toItem(fresh[0] as ItemRow);
+  });
+}
+
+/** Rearranges: moves an item one place up or down within its day (a no-op at either end). */
+export async function moveItem(
+  pool: pg.Pool,
+  userId: number,
+  tripId: number,
+  itemId: number,
+  direction: MoveDirection,
+): Promise<ItineraryItem> {
+  return withTransaction(pool, async (db) => {
+    await loadOwnedTrip(db, userId, tripId);
+    const { rows } = await db.query<ItemRow>(
+      `select ${ITEM_COLUMNS} from itinerary_items where id = $1 and trip_id = $2`,
+      [itemId, tripId],
+    );
+    const current = rows[0];
+    if (!current) throw notFound('Itinerary item');
+
+    const ids = (await readDay(db, tripId, current.day)).map((entry) => entry.id);
+    await writeDayOrder(db, tripId, current.day, moveInOrder(ids, itemId, direction));
+    const { rows: fresh } = await db.query<ItemRow>(
+      `select ${ITEM_COLUMNS} from itinerary_items where id = $1`,
+      [itemId],
     );
     return toItem(fresh[0] as ItemRow);
   });

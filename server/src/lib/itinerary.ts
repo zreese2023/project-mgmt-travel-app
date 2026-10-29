@@ -55,6 +55,26 @@ export function insertAt(ids: readonly number[], id: number, index: number): num
   return [...ids.slice(0, at), id, ...ids.slice(at)];
 }
 
+export type MoveDirection = 'up' | 'down';
+
+/**
+ * Moves `id` one place earlier or later in an ordered list of ids. Moving the first item up or
+ * the last item down, or an unknown id, changes nothing. Pure; returns a new array.
+ */
+export function moveInOrder(
+  ids: readonly number[],
+  id: number,
+  direction: MoveDirection,
+): number[] {
+  const from = ids.indexOf(id);
+  const to = direction === 'up' ? from - 1 : from + 1;
+  const result = [...ids];
+  if (from === -1 || to < 0 || to >= ids.length) return result;
+  result[from] = ids[to] as number;
+  result[to] = id;
+  return result;
+}
+
 /**
  * Groups items into a daily timeline. Every day in the trip range appears (even when empty),
  * plus any day outside the range that holds an item (e.g. a return flight after the trip end).

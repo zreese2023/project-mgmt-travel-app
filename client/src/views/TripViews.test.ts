@@ -11,6 +11,8 @@ vi.mock('../api/endpoints', () => ({
       remove: vi.fn(),
       addItem: vi.fn(),
       removeItem: vi.fn(),
+      updateItem: vi.fn(),
+      moveItem: vi.fn(),
     },
     destinations: { search: vi.fn(), get: vi.fn() },
   },
@@ -233,6 +235,98 @@ describe('SCRUM-31/32: itinerary page', () => {
     await flushPromises();
     expect(endpoints.trips.removeItem).toHaveBeenCalledWith(3, 1);
     expect(endpoints.trips.get).toHaveBeenCalledTimes(2);
+  });
+
+  it('edits an item inline: title, day, time and notes', async () => {
+    vi.mocked(endpoints.trips.updateItem).mockResolvedValue({ item: item(1) });
+    const { wrapper } = await open();
+    await wrapper.get('button[aria-label="Edit Breakfast"]').trigger('click');
+    expect((wrapper.get('input[aria-label="Title"]').element as HTMLInputElement).value).toBe(
+      'Breakfast',
+    );
+    await wrapper.get('input[aria-label="Title"]').setValue('Late breakfast');
+    await wrapper.get('select[aria-label="Day"]').setValue('2026-11-06');
+    await wrapper.get('input[aria-label="Time"]').setValue('09:30');
+    await wrapper.get('input[aria-label="Notes"]').setValue('At the hotel');
+    await wrapper.get('li form').trigger('submit');
+    await flushPromises();
+
+    expect(endpoints.trips.updateItem).toHaveBeenCalledWith(3, 1, {
+      title: 'Late breakfast',
+      day: '2026-11-06',
+      startTime: '09:30',
+      notes: 'At the hotel',
+    });
+    expect(endpoints.trips.get).toHaveBeenCalledTimes(2); // itinerary reloaded
+    expect(wrapper.find('li form').exists()).toBe(false);
+  });
+
+  it('clears the time and notes when they are emptied', async () => {
+    vi.mocked(endpoints.trips.updateItem).mockResolvedValue({ item: item(2) });
+    const { wrapper } = await open();
+    await wrapper.get('button[aria-label="Edit Visit Shibuya station"]').trigger('click');
+    await wrapper.get('input[aria-label="Time"]').setValue('');
+    await wrapper.get('input[aria-label="Notes"]').setValue('');
+    await wrapper.get('li form').trigger('submit');
+    await flushPromises();
+    expect(vi.mocked(endpoints.trips.updateItem).mock.calls[0]?.[2]).toMatchObject({
+      startTime: null,
+      notes: null,
+    });
+  });
+
+  it('can cancel an edit without saving', async () => {
+    const { wrapper } = await open();
+    await wrapper.get('button[aria-label="Edit Breakfast"]').trigger('click');
+    const cancel = wrapper.findAll('li form button').find((b) => b.text() === 'Cancel');
+    await cancel!.trigger('click');
+    expect(wrapper.find('li form').exists()).toBe(false);
+    expect(endpoints.trips.updateItem).not.toHaveBeenCalled();
+  });
+
+  it('shows the server message when an edit is rejected and keeps the form open', async () => {
+    vi.mocked(endpoints.trips.updateItem).mockRejectedValue(
+      new ApiError(422, 'validation_error', 'Title is required', { title: 'Enter a title' }),
+    );
+    const { wrapper } = await open();
+    await wrapper.get('button[aria-label="Edit Breakfast"]').trigger('click');
+    await wrapper.get('li form').trigger('submit');
+    await flushPromises();
+    expect(wrapper.get('[role="status"]').text()).toContain('Title is required');
+    expect(wrapper.find('li form').exists()).toBe(true);
+  });
+
+  it('rearranges: move up and down buttons call the API, and are disabled at the ends', async () => {
+    vi.mocked(endpoints.trips.moveItem).mockResolvedValue({ item: item(2) });
+    const { wrapper } = await open();
+    expect(
+      wrapper.get('button[aria-label="Move Breakfast up"]').attributes('disabled'),
+    ).toBeDefined();
+    expect(
+      wrapper.get('button[aria-label="Move Flight SK100: JFK to NRT down"]').attributes('disabled'),
+    ).toBeDefined();
+    expect(
+      wrapper.get('button[aria-label="Move Visit Shibuya station up"]').attributes('disabled'),
+    ).toBeUndefined();
+
+    await wrapper.get('button[aria-label="Move Visit Shibuya station up"]').trigger('click');
+    await flushPromises();
+    expect(endpoints.trips.moveItem).toHaveBeenCalledWith(3, 2, 'up');
+    expect(endpoints.trips.get).toHaveBeenCalledTimes(2);
+
+    await wrapper.get('button[aria-label="Move Visit Shibuya station down"]').trigger('click');
+    await flushPromises();
+    expect(endpoints.trips.moveItem).toHaveBeenLastCalledWith(3, 2, 'down');
+  });
+
+  it('shows an error if a move fails', async () => {
+    vi.mocked(endpoints.trips.moveItem).mockRejectedValue(
+      new ApiError(0, 'network_error', 'Cannot reach the server.'),
+    );
+    const { wrapper } = await open();
+    await wrapper.get('button[aria-label="Move Visit Shibuya station up"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.get('[role="status"]').text()).toContain('Cannot reach the server');
   });
 
   it('links to flights and hotels pre-filled with the trip destination and dates', async () => {

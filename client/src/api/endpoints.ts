@@ -61,6 +61,15 @@ export function createEndpoints(client: ApiClient) {
       remove: (id: number) => client.delete<void>(`/trips/${id}`),
       addItem: (tripId: number, item: NewItem) =>
         client.post<{ item: ItineraryItem }>(`/trips/${tripId}/items`, item),
+      updateItem: (
+        tripId: number,
+        itemId: number,
+        patch: { title?: string; notes?: string | null; day?: string; startTime?: string | null },
+      ) => client.patch<{ item: ItineraryItem }>(`/trips/${tripId}/items/${itemId}`, patch),
+      moveItem: (tripId: number, itemId: number, direction: 'up' | 'down') =>
+        client.post<{ item: ItineraryItem }>(`/trips/${tripId}/items/${itemId}/move`, {
+          direction,
+        }),
       removeItem: (tripId: number, itemId: number) =>
         client.delete<void>(`/trips/${tripId}/items/${itemId}`),
     },

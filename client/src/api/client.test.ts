@@ -179,6 +179,11 @@ describe('Endpoint functions', () => {
     expect(lastCall(fetch)).toMatchObject({ url: '/api/trips/3', method: 'DELETE' });
     await e.trips.addItem(3, { kind: 'note', title: 'x', day: '2026-11-05' });
     expect(lastCall(fetch)).toMatchObject({ url: '/api/trips/3/items', method: 'POST' });
+    await e.trips.updateItem(3, 9, { title: 'y' });
+    expect(lastCall(fetch)).toMatchObject({ url: '/api/trips/3/items/9', method: 'PATCH' });
+    await e.trips.moveItem(3, 9, 'up');
+    expect(lastCall(fetch)).toMatchObject({ url: '/api/trips/3/items/9/move', method: 'POST' });
+    expect(lastCall(fetch).body).toBe('{"direction":"up"}');
     await e.trips.removeItem(3, 9);
     expect(lastCall(fetch)).toMatchObject({ url: '/api/trips/3/items/9', method: 'DELETE' });
   });

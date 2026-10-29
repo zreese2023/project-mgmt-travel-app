@@ -5,6 +5,7 @@ import {
   insertAt,
   insertionIndex,
   isHourMinute,
+  moveInOrder,
   summarizeTrip,
   toHourMinute,
   type ItineraryItem,
@@ -133,5 +134,27 @@ describe('SCRUM-32: parsing an add-item request', () => {
       expect((err as AppError).statusCode).toBe(422);
       expect((err as AppError).details).toHaveProperty(field);
     }
+  });
+});
+
+describe('SCRUM-32: rearranging items (pure)', () => {
+  it('moves an item one place up or down', () => {
+    expect(moveInOrder([1, 2, 3], 2, 'up')).toEqual([2, 1, 3]);
+    expect(moveInOrder([1, 2, 3], 2, 'down')).toEqual([1, 3, 2]);
+    expect(moveInOrder([1, 2, 3], 3, 'up')).toEqual([1, 3, 2]);
+  });
+
+  it('does nothing at either end, for a single item or for an unknown id', () => {
+    expect(moveInOrder([1, 2, 3], 1, 'up')).toEqual([1, 2, 3]);
+    expect(moveInOrder([1, 2, 3], 3, 'down')).toEqual([1, 2, 3]);
+    expect(moveInOrder([7], 7, 'up')).toEqual([7]);
+    expect(moveInOrder([1, 2, 3], 99, 'down')).toEqual([1, 2, 3]);
+    expect(moveInOrder([], 1, 'up')).toEqual([]);
+  });
+
+  it('never mutates its input', () => {
+    const ids = [1, 2, 3];
+    moveInOrder(ids, 2, 'up');
+    expect(ids).toEqual([1, 2, 3]);
   });
 });

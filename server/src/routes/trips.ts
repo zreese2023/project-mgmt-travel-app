@@ -5,8 +5,10 @@ import {
   deleteTrip,
   getTripDetail,
   listTrips,
+  moveItem,
   parseNewItem,
   removeItem,
+  updateItem,
   type NewItemBody,
 } from '../lib/trips.js';
 
@@ -56,7 +58,7 @@ export async function tripRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  // SCRUM-31/32: add and remove itinerary items
+  // SCRUM-31/32: add, edit, rearrange and remove itinerary items
   app.post<{ Params: { id: number }; Body: NewItemBody }>(
     '/trips/:id/items',
     {
@@ -90,6 +92,61 @@ export async function tripRoutes(app: FastifyInstance): Promise<void> {
       );
       return reply.status(201).send({ item });
     },
+  );
+
+  app.patch<{
+    Params: { id: number; itemId: number };
+    Body: { title?: string; notes?: string | null; day?: string; startTime?: string | null };
+  }>(
+    '/trips/:id/items/:itemId',
+    {
+      schema: {
+        params: { type: 'object', properties: { id: idParam, itemId: idParam } },
+        body: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            title: { type: 'string', maxLength: 200 },
+            notes: { type: ['string', 'null'], maxLength: 1000 },
+            day: { type: 'string', maxLength: 10 },
+            startTime: { type: ['string', 'null'], maxLength: 5 },
+          },
+        },
+      },
+    },
+    async (request) => ({
+      item: await updateItem(
+        app.pg.pool,
+        request.user.id,
+        request.params.id,
+        request.params.itemId,
+        request.body,
+      ),
+    }),
+  );
+
+  app.post<{ Params: { id: number; itemId: number }; Body: { direction: 'up' | 'down' } }>(
+    '/trips/:id/items/:itemId/move',
+    {
+      schema: {
+        params: { type: 'object', properties: { id: idParam, itemId: idParam } },
+        body: {
+          type: 'object',
+          required: ['direction'],
+          additionalProperties: false,
+          properties: { direction: { type: 'string', enum: ['up', 'down'] } },
+        },
+      },
+    },
+    async (request) => ({
+      item: await moveItem(
+        app.pg.pool,
+        request.user.id,
+        request.params.id,
+        request.params.itemId,
+        request.body.direction,
+      ),
+    }),
   );
 
   app.delete<{ Params: { id: number; itemId: number } }>(

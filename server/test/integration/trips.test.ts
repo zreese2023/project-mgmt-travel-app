@@ -45,7 +45,7 @@ describe('Itinerary (real Postgres)', () => {
   const end = daysFromNow(23); // 4 days
 
   const call = (
-    method: 'GET' | 'POST' | 'DELETE',
+    method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
     url: string,
     who: TestUser | null,
     payload?: object,
@@ -218,7 +218,7 @@ describe('Itinerary (real Postgres)', () => {
     });
   });
 
-  describe('SCRUM-32: add and remove itinerary items', () => {
+  describe('SCRUM-32: add, edit, rearrange and remove itinerary items', () => {
     it('removes an item and closes the gap in the day order', async () => {
       const id = await newTrip();
       const a = (await addItem(id, { kind: 'note', title: 'A', day: start })).json().item;
@@ -232,6 +232,106 @@ describe('Itinerary (real Postgres)', () => {
         ['C', 1],
       ]);
       expect((await call('DELETE', `/trips/${id}/items/${a.id}`, user)).statusCode).toBe(404);
+    });
+
+    it('edits title, notes and time, repositioning by time', async () => {
+      const id = await newTrip();
+      await addItem(id, { kind: 'note', title: 'Early', day: start, startTime: '08:00' });
+      const late = (
+        await addItem(id, { kind: 'note', title: 'Late', day: start, startTime: '20:00' })
+      ).json().item;
+      const res = await call('PATCH', `/trips/${id}/items/${late.id}`, user, {
+        title: 'Moved',
+        startTime: '07:00',
+        notes: 'bring camera',
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.json().item).toMatchObject({
+        title: 'Moved',
+        startTime: '07:00',
+        notes: 'bring camera',
+      });
+      expect(((await detail(id)).days[0]?.items ?? []).map((i) => i.title)).toEqual([
+        'Moved',
+        'Early',
+      ]);
+
+      const cleared = await call('PATCH', `/trips/${id}/items/${late.id}`, user, {
+        startTime: null,
+        notes: null,
+      });
+      expect(cleared.json().item).toMatchObject({ startTime: null, notes: null });
+    });
+
+    it('moves an item to another day and re-sequences both days', async () => {
+      const id = await newTrip();
+      await addItem(id, { kind: 'note', title: 'One', day: start });
+      const two = (await addItem(id, { kind: 'note', title: 'Two', day: start })).json().item;
+      await addItem(id, { kind: 'note', title: 'Three', day: start });
+      const day2 = daysFromNow(21);
+      const res = await call('PATCH', `/trips/${id}/items/${two.id}`, user, { day: day2 });
+      expect(res.json().item.day).toBe(day2);
+
+      const body = await detail(id);
+      expect((body.days[0]?.items ?? []).map((i) => [i.title, i.position])).toEqual([
+        ['One', 0],
+        ['Three', 1],
+      ]);
+      expect((body.days[1]?.items ?? []).map((i) => [i.title, i.position])).toEqual([['Two', 0]]);
+    });
+
+    it('rejects invalid edits: blank title, bad time, day outside the trip, unknown item', async () => {
+      const id = await newTrip();
+      const note = (await addItem(id, { kind: 'note', title: 'Keep', day: start })).json().item;
+      const patch = (payload: object) =>
+        call('PATCH', `/trips/${id}/items/${note.id}`, user, payload);
+      expect((await patch({ title: '   ' })).statusCode).toBe(422);
+      expect((await patch({ startTime: '25:99' })).statusCode).toBe(422);
+      expect((await patch({ day: daysFromNow(60) })).statusCode).toBe(422);
+      expect(
+        (await call('PATCH', `/trips/${id}/items/999999999`, user, { title: 'x' })).statusCode,
+      ).toBe(404);
+      expect(((await detail(id)).days[0]?.items ?? [])[0]?.title).toBe('Keep');
+    });
+
+    it('rearranges: moves an item up and down within its day, and stops at the ends', async () => {
+      const id = await newTrip();
+      const a = (await addItem(id, { kind: 'note', title: 'A', day: start })).json().item;
+      const b = (await addItem(id, { kind: 'note', title: 'B', day: start })).json().item;
+      const c = (await addItem(id, { kind: 'note', title: 'C', day: start })).json().item;
+      const order = async () => ((await detail(id)).days[0]?.items ?? []).map((i) => i.title);
+      const move = (itemId: number, direction: string) =>
+        call('POST', `/trips/${id}/items/${itemId}/move`, user, { direction });
+
+      expect(await order()).toEqual(['A', 'B', 'C']);
+      expect((await move(c.id, 'up')).statusCode).toBe(200);
+      expect(await order()).toEqual(['A', 'C', 'B']);
+      await move(a.id, 'down');
+      expect(await order()).toEqual(['C', 'A', 'B']);
+
+      await move(c.id, 'up'); // already first: unchanged
+      await move(b.id, 'down'); // already last: unchanged
+      expect(await order()).toEqual(['C', 'A', 'B']);
+      expect(((await detail(id)).days[0]?.items ?? []).map((i) => i.position)).toEqual([0, 1, 2]);
+    });
+
+    it('only reorders within one day and rejects a bad direction or unknown item', async () => {
+      const id = await newTrip();
+      const day1 = (await addItem(id, { kind: 'note', title: 'D1', day: start })).json().item;
+      await addItem(id, { kind: 'note', title: 'D2', day: daysFromNow(21) });
+      await call('POST', `/trips/${id}/items/${day1.id}/move`, user, { direction: 'down' });
+      const body = await detail(id);
+      expect((body.days[0]?.items ?? []).map((i) => i.title)).toEqual(['D1']);
+      expect((body.days[1]?.items ?? []).map((i) => i.title)).toEqual(['D2']);
+
+      expect(
+        (await call('POST', `/trips/${id}/items/${day1.id}/move`, user, { direction: 'sideways' }))
+          .statusCode,
+      ).toBe(400);
+      expect(
+        (await call('POST', `/trips/${id}/items/999999999/move`, user, { direction: 'up' }))
+          .statusCode,
+      ).toBe(404);
     });
 
     it('deletes a trip together with its items', async () => {
@@ -254,6 +354,14 @@ describe('Itinerary (real Postgres)', () => {
       expect((await addItem(id, { kind: 'note', title: 'x', day: start }, other)).statusCode).toBe(
         404,
       );
+      expect(
+        (await call('PATCH', `/trips/${id}/items/${item.id}`, other, { title: 'hijack' }))
+          .statusCode,
+      ).toBe(404);
+      expect(
+        (await call('POST', `/trips/${id}/items/${item.id}/move`, other, { direction: 'up' }))
+          .statusCode,
+      ).toBe(404);
       expect((await call('DELETE', `/trips/${id}/items/${item.id}`, other)).statusCode).toBe(404);
       expect(((await call('GET', '/trips', other)).json().trips as unknown[]).length).toBe(0);
     });
@@ -271,6 +379,10 @@ describe('Itinerary (real Postgres)', () => {
         ).statusCode,
       ).toBe(401);
       expect((await call('GET', '/trips/1', null)).statusCode).toBe(401);
+      expect((await call('PATCH', '/trips/1/items/1', null, { title: 'x' })).statusCode).toBe(401);
+      expect(
+        (await call('POST', '/trips/1/items/1/move', null, { direction: 'up' })).statusCode,
+      ).toBe(401);
     });
   });
 });

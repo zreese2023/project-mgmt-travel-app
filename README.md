@@ -10,8 +10,8 @@ flights and hotels, check the weather and build a day-by-day itinerary.
 - **Destination search and filtering:** keyword search plus region, budget and interest filters, and a
   details page with a photo, description and activities.
 - **Flights and hotels:** search, filter and sort, then select a result and add it to a trip.
-- **Itinerary builder:** create a trip, then add or remove activities, flights and hotels on a
-  day-by-day timeline. Trips are saved to your account.
+- **Itinerary builder:** create a trip, then add, edit, move up or down, and remove activities,
+  flights and hotels on a day-by-day timeline. Trips are saved to your account.
 - **Weather popup:** current conditions and a 5-day forecast from the free
   [Open-Meteo](https://open-meteo.com/) API, with a friendly message if it cannot be reached.
 - **Accounts:** register, sign in and sign out.
@@ -45,7 +45,7 @@ On later days you only need `npm run db:up` (if the database container is stoppe
 3. Open **Flights** (or use "Find flights" inside the trip), search, select a flight and choose
    **Add to trip**. Do the same with a hotel.
 4. Open the trip to see the timeline. Add your own activity, such as "Visit Shibuya station" at 1:00 pm,
-   and remove items you do not want.
+   then edit it, move it up or down, or remove it.
 
 ## Commands
 
