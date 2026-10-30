@@ -47,6 +47,7 @@ describe('SCRUM-11: home page', () => {
     const { wrapper } = await mountWithApp(HomeView);
     expect(wrapper.findAll('[data-testid="destination-card"]')).toHaveLength(6);
     expect(wrapper.text()).toMatch(/sample data/i);
+    expect(wrapper.text()).toMatch(/not an official source/i);
   });
 
   it('sends the keyword to the destinations page', async () => {

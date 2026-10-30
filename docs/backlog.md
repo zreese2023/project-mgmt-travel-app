@@ -54,7 +54,7 @@ Story IDs missing from the source numbering (SCRUM-16..20, SCRUM-28..30) are not
 | SCRUM-12 | Filter Destinations | UC-01 | 3 | Must | 1 | In Review |
 | SCRUM-13 | View Destination Details | UC-01 | 3 | Must | 1 | In Review |
 | SCRUM-14 | View Weather | UC-05 | 5 | Must | 1 | In Review |
-| SCRUM-15 | View Travel Restrictions | UC-06 | 3 | Must | 1 | Descoped |
+| SCRUM-15 | View Travel Restrictions | UC-06 | 3 | Must | 1 | In Review |
 
 **SCRUM-11: Search Destinations by Keyword.** As a traveler, I want to search destinations by keyword so I can explore trip options.
 *AC:* Given a keyword, the system returns matching destinations.
@@ -75,7 +75,7 @@ Story IDs missing from the source numbering (SCRUM-16..20, SCRUM-28..30) are not
 
 **SCRUM-15: View Travel Restrictions.** As a traveler, I want to view travel advisories and restrictions so I can plan accordingly.
 *AC:* The selected destination shows any relevant travel advisories or restrictions sourced from official government data.
-*Scope:* Advisory banner (levels 1-4) from the seeded dataset, labelled **illustrative sample data, not official guidance** (G-02, AC is reworded accordingly pending approval).
+*Scope:* advisory banner (levels 1-4) for the destination's country from the **U.S. Department of State** travel-advisory feed (`cadataapi.state.gov`), cached for 6 hours, with a source line and a link to the full advisory. If the feed cannot be reached, a made-up **sample** advisory from the seed data is shown, clearly labelled as sample data. The State Department issues none for the United States, so US destinations show a note instead. Gap G-02 resolved by PM (2026-10-29): use the US Department of State feed.
 *Planned tests:* level to label/colour mapping; banner renders each level; override beats dataset value (the override itself is built in SCRUM-41); label always visible.
 
 ## 5. Epic 2: Booking and Payment System
@@ -232,3 +232,5 @@ Each needs your decision or a veto. "Proposed" is what I will implement if you a
 | 2026-10-22 | SCRUM-26, 33, 35, 37, 41, 43 (manage bookings, alerts, past trips, cancel, saved payment methods, advisory override) still depend on the removed booking and notification features and would need them rebuilt when scheduled. | Consequence of the descoping above. |
 | 2026-10-22 | **Second descoping pass, to match ConOps 5.1 exactly:** removed the travel advisory banner, API and seed data (SCRUM-15, not in the 5.1 list), itinerary item editing (5.1 says add or remove) and the trip rename/date-change API. Kept: accounts, destination search and filters and details, flight and hotel search with Add to trip, add/remove itinerary builder (plus create, list and delete trip), weather popup and panel. | PM pasted ConOps 5.1 as the Sprint 1 definition. |
 | 2026-10-29 | **PM approved SCRUM-32 (edit itinerary) and SCRUM-12 (filter destinations) for Sprint 1.** SCRUM-12 was never removed; it is in and covered by tests. SCRUM-32 now covers add, edit (title, day, time, notes), remove and rearrange with move up/down buttons within a day, which meets the story's "add, remove, or rearrange" criteria. Drag-and-drop reordering (SCRUM-36, ConOps 5.2) is still Sprint 2 and is not built. Trip rename and date changes are not built. | PM direction. |
+| 2026-10-29 | **PM approved SCRUM-15 (view travel restrictions) back into Sprint 1.** Restored as a read-only advisory banner (levels 1 to 4) on each destination page, from the seeded sample dataset, always labelled "Illustrative sample data, not official guidance" (gap G-02). The admin override (SCRUM-41) and the restriction search (SCRUM-39) remain Sprint 2 and are not built. | PM direction. |
+| 2026-10-29 | **SCRUM-15 now uses live U.S. Department of State data** instead of the made-up seed advisories (PM direction, resolves G-02). Source: `https://cadataapi.state.gov/api/TravelAdvisories` (no key; 218 countries; levels 1-4). Matched to destinations by country name because the feed's country codes are not ISO (for example `GB` is Gabon). Seeded advisories remain only as a labelled fallback. This satisfies "official government data" for US advisories only; the UI says the advice is for U.S. citizens and that Wayfarer is not an official source. | PM direction. |

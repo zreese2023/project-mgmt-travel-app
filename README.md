@@ -4,6 +4,8 @@ A travel and tourism web app prototype for a project management class: search de
 flights and hotels, check the weather and build a day-by-day itinerary.
 
 **All flights, hotels and prices are fictional sample data.** Nothing can be booked or paid for.
+Weather and travel advisories are live data from the free Open-Meteo and U.S. State Department
+services, so those need an internet connection (the app still works without it).
 
 ## What it does (Sprint 1 MVP, ConOps 5.1)
 
@@ -12,6 +14,9 @@ flights and hotels, check the weather and build a day-by-day itinerary.
 - **Flights and hotels:** search, filter and sort, then select a result and add it to a trip.
 - **Itinerary builder:** create a trip, then add, edit, move up or down, and remove activities,
   flights and hotels on a day-by-day timeline. Trips are saved to your account.
+- **Travel advisories:** each destination shows the U.S. Department of State travel advisory for its
+  country (level 1 to 4) with a link to the full text. If that service cannot be reached, a made-up
+  sample advisory is shown instead, clearly labelled. Wayfarer is not an official source.
 - **Weather popup:** current conditions and a 5-day forecast from the free
   [Open-Meteo](https://open-meteo.com/) API, with a friendly message if it cannot be reached.
 - **Accounts:** register, sign in and sign out.

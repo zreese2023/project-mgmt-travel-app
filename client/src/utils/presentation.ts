@@ -1,5 +1,14 @@
 import type { TempUnit, WeatherIcon } from '../api/types';
 
+/** CSS modifier for an advisory level (1 to 4); unknown levels fall back to level 1. */
+export function advisoryClass(level: number): string {
+  return `advisory--level-${level >= 1 && level <= 4 ? level : 1}`;
+}
+
+export function advisorySymbol(level: number): string {
+  return ['', 'i', '!', '!!', '!!!'][level] ?? 'i';
+}
+
 const WEATHER_EMOJI: Record<WeatherIcon, string> = {
   clear: '☀️',
   'partly-cloudy': '⛅',

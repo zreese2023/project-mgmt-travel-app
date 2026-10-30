@@ -54,6 +54,8 @@ onMounted(loadPopular);
 
   <p class="notice" role="note">
     <strong>Prototype notice:</strong> flights, hotels and prices are <strong>sample data</strong>.
+    Travel advisories come from the U.S. Department of State when it can be reached (otherwise a
+    labelled sample is shown), and Wayfarer is <strong>not an official source</strong>.
   </p>
 
   <h2>Popular destinations</h2>

@@ -1,6 +1,6 @@
--- Wayfarer schema (PostgreSQL 16), Sprint 1 scope: accounts, destinations, flights, hotels and
--- itineraries. Money is numeric(10,2) (parsed to number by the server); dates are `date`,
--- instants `timestamptz`. All flight and hotel rows are SAMPLE data.
+-- Wayfarer schema (PostgreSQL 16), Sprint 1 scope: accounts, destinations, flights, hotels,
+-- advisories and itineraries. Money is numeric(10,2) (parsed to number by the server); dates are
+-- `date`, instants `timestamptz`. All flight, hotel and advisory rows are SAMPLE data.
 
 create table users (
   id            integer generated always as identity primary key,
@@ -87,6 +87,15 @@ create table room_types (
   nightly_price numeric(10,2) not null check (nightly_price >= 0)
 );
 create index room_types_hotel_idx on room_types (hotel_id);
+
+-- Made-up FALLBACK advisories (see seed.sql). Live advisories come from the State Department feed.
+create table advisories (
+  destination_id integer primary key references destinations (id) on delete cascade,
+  level          integer not null check (level between 1 and 4),
+  summary        text not null,
+  categories     text[] not null default '{}',
+  source_label   text not null default 'Illustrative sample data, not official guidance'
+);
 
 create table trips (
   id             integer generated always as identity primary key,

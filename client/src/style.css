@@ -355,6 +355,47 @@ input[type='radio'] {
   flex: 1;
 }
 
+/* ---- advisory banner ---- */
+.advisory {
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-left: 6px solid var(--level-1);
+}
+.advisory--level-1 {
+  border-left-color: var(--level-1);
+}
+.advisory--level-2 {
+  border-left-color: var(--level-2);
+}
+.advisory--level-3 {
+  border-left-color: var(--level-3);
+}
+.advisory--level-4 {
+  border-left-color: var(--level-4);
+}
+.advisory__title {
+  font-weight: 700;
+}
+.advisory--level-1 .advisory__level {
+  color: var(--level-1);
+}
+.advisory--level-2 .advisory__level {
+  color: var(--level-2);
+}
+.advisory--level-3 .advisory__level {
+  color: var(--level-3);
+}
+.advisory--level-4 .advisory__level {
+  color: var(--level-4);
+}
+.advisory__disclaimer {
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin: 0.4rem 0 0;
+}
+
 /* ---- weather ---- */
 .weather-badge {
   display: inline-flex;

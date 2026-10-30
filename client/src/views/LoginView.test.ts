@@ -32,10 +32,10 @@ async function submit(location: string | object = '/login') {
 describe('SCRUM-34: login', () => {
   it('signs in and goes to the page the user originally wanted', async () => {
     vi.mocked(endpoints.auth.login).mockResolvedValue({ user });
-    const { router } = await submit({ path: '/login', query: { redirect: '/profile' } });
+    const { router } = await submit({ path: '/login', query: { redirect: '/trips' } });
     await flushPromises();
     expect(endpoints.auth.login).toHaveBeenCalledWith({ email: 'a@b.co', password: 'secret-pw' });
-    expect(router.currentRoute.value.path).toBe('/profile');
+    expect(router.currentRoute.value.path).toBe('/trips');
   });
 
   it('ignores an external redirect target and goes home', async () => {

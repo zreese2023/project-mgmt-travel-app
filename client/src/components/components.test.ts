@@ -1,8 +1,22 @@
 import { mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it } from 'vitest';
-import type { Weather } from '../api/types';
+import type { Advisory, Weather } from '../api/types';
+import AdvisoryBanner from './AdvisoryBanner.vue';
 import WeatherBadge from './WeatherBadge.vue';
 import WeatherPanel from './WeatherPanel.vue';
+
+const advisory = (overrides: Partial<Advisory> = {}): Advisory => ({
+  destinationSlug: 'paris',
+  level: 2,
+  label: 'Increased caution',
+  summary: 'Sample advisory: watch for pickpockets.',
+  categories: ['safety'],
+  kind: 'sample',
+  sourceLabel: 'Illustrative sample data, not official guidance',
+  sourceUrl: null,
+  updatedAt: null,
+  ...overrides,
+});
 
 const sunny: Weather = {
   available: true,
@@ -14,6 +28,72 @@ const sunny: Weather = {
     { date: '2026-10-22', condition: 'Clear sky', icon: 'clear', high: 70, low: 58 },
   ],
 };
+
+describe('SCRUM-15: AdvisoryBanner', () => {
+  it.each([
+    [1, 'Normal precautions'],
+    [2, 'Increased caution'],
+    [3, 'Reconsider travel'],
+    [4, 'Do not travel'],
+  ])('renders level %i with its label and colour class', (level, label) => {
+    const wrapper = mount(AdvisoryBanner, { props: { advisory: advisory({ level, label }) } });
+    const banner = wrapper.get('[data-testid="advisory-banner"]');
+    expect(banner.classes()).toContain(`advisory--level-${level}`);
+    expect(banner.text()).toContain(`Level ${level}: ${label}`);
+  });
+
+  it('shows the summary and categories', () => {
+    const wrapper = mount(AdvisoryBanner, { props: { advisory: advisory() } });
+    expect(wrapper.text()).toContain('watch for pickpockets');
+    expect(wrapper.text()).toContain('safety');
+  });
+
+  it('always shows the "not official" label, using the disclaimer when given', () => {
+    const plain = mount(AdvisoryBanner, { props: { advisory: advisory() } });
+    expect(plain.get('[data-testid="advisory-disclaimer"]').text()).toMatch(/not official/i);
+    const withDisclaimer = mount(AdvisoryBanner, {
+      props: {
+        advisory: advisory(),
+        disclaimer: 'Illustrative sample data, not official guidance. Check your government.',
+      },
+    });
+    expect(withDisclaimer.get('[data-testid="advisory-disclaimer"]').text()).toContain(
+      'Check your government',
+    );
+  });
+
+  it('shows a live advisory with its source, update date and a link to the full text', () => {
+    const wrapper = mount(AdvisoryBanner, {
+      props: {
+        advisory: advisory({
+          kind: 'live',
+          sourceLabel: 'U.S. Department of State travel advisory for Brazil. Updated 2026-10-22.',
+          sourceUrl: 'https://travel.state.gov/brazil.html',
+          updatedAt: '2026-10-23T00:00:00.000Z',
+        }),
+      },
+    });
+    expect(wrapper.get('[data-testid="advisory-source"]').text()).toContain(
+      'U.S. Department of State travel advisory for Brazil. Updated 2026-10-22.',
+    );
+    const link = wrapper.get('[data-testid="advisory-source"] a');
+    expect(link.attributes('href')).toBe('https://travel.state.gov/brazil.html');
+    expect(link.attributes('rel')).toContain('noopener');
+    expect(link.attributes('target')).toBe('_blank');
+    expect(wrapper.find('[data-testid="advisory-sample"]').exists()).toBe(false);
+  });
+
+  it('marks a fallback advisory as sample data and has no link', () => {
+    const wrapper = mount(AdvisoryBanner, { props: { advisory: advisory() } });
+    expect(wrapper.get('[data-testid="advisory-sample"]').text()).toBe('Sample data');
+    expect(wrapper.find('[data-testid="advisory-source"] a').exists()).toBe(false);
+  });
+
+  it('omits the tag list when there are no categories', () => {
+    const wrapper = mount(AdvisoryBanner, { props: { advisory: advisory({ categories: [] }) } });
+    expect(wrapper.findAll('.chip')).toHaveLength(1); // only the "Sample data" chip
+  });
+});
 
 describe('SCRUM-14: WeatherPanel states', () => {
   it('shows a loading state', () => {

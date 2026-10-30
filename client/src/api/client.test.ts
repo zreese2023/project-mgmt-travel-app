@@ -141,6 +141,8 @@ describe('Endpoint functions', () => {
     await e.destinations.weather('rio de janeiro', 'C');
     expect(lastCall(fetch).url).toBe('/api/destinations/rio%20de%20janeiro/weather?unit=C');
     await e.destinations.get('tokyo');
+    await e.destinations.advisory('tokyo');
+    expect(fetch.mock.calls.map(([u]) => u)).toContain('/api/destinations/tokyo/advisory');
     await e.destinations.filters();
   });
 

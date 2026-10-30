@@ -8,6 +8,7 @@ import AppHeader from './components/AppHeader.vue';
     <RouterView />
   </main>
   <footer class="container muted small">
-    Wayfarer is a class project prototype. Flights, hotels and prices are sample data.
+    Wayfarer is a class project prototype and not an official source. Flights, hotels and prices are
+    sample data. Travel advisories are from the U.S. Department of State.
   </footer>
 </template>

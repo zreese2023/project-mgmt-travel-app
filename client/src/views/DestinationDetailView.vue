@@ -3,7 +3,8 @@ import { computed, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { ApiError } from '../api/client';
 import { endpoints } from '../api/endpoints';
-import type { DestinationDetail, TempUnit } from '../api/types';
+import type { Advisory, DestinationDetail, TempUnit } from '../api/types';
+import AdvisoryBanner from '../components/AdvisoryBanner.vue';
 import WeatherBadge from '../components/WeatherBadge.vue';
 import WeatherPanel from '../components/WeatherPanel.vue';
 import { useWeather } from '../composables/useWeather';
@@ -15,6 +16,9 @@ const route = useRoute();
 const slug = computed(() => String(route.params.slug));
 const unit = ref<TempUnit>('F');
 const destination = ref<DestinationDetail | null>(null);
+const advisory = ref<Advisory | null>(null);
+const disclaimer = ref<string | undefined>(undefined);
+const advisoryNote = ref<string | null>(null);
 const loading = ref(true);
 const notFound = ref(false);
 const error = ref<string | null>(null);
@@ -26,8 +30,18 @@ async function load(): Promise<void> {
   notFound.value = false;
   error.value = null;
   destination.value = null;
+  advisory.value = null;
+  advisoryNote.value = null;
   try {
     destination.value = (await endpoints.destinations.get(slug.value)).destination;
+    try {
+      const result = await endpoints.destinations.advisory(slug.value);
+      advisory.value = result.advisory;
+      disclaimer.value = result.disclaimer;
+      advisoryNote.value = result.note ?? null;
+    } catch {
+      advisory.value = null; // the advisory is supplementary; the page still works without it
+    }
   } catch (err) {
     if (err instanceof ApiError && err.status === 404) notFound.value = true;
     else error.value = errorMessage(err);
@@ -68,6 +82,9 @@ watch(slug, load, { immediate: true });
         @retry="reloadWeather"
       />
     </div>
+
+    <AdvisoryBanner v-if="advisory" :advisory="advisory" :disclaimer="disclaimer" />
+    <p v-else-if="advisoryNote" class="notice" data-testid="advisory-note">{{ advisoryNote }}</p>
 
     <section class="card">
       <h2>About {{ destination.name }}</h2>

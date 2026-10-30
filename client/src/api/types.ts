@@ -59,6 +59,26 @@ export interface DestinationQuery {
   interest?: string[];
 }
 
+export interface Advisory {
+  destinationSlug: string;
+  level: number;
+  label: string;
+  summary: string;
+  categories: string[];
+  /** 'live' = U.S. Department of State feed; 'sample' = made-up fallback. */
+  kind: 'live' | 'sample';
+  sourceLabel: string;
+  sourceUrl: string | null;
+  updatedAt: string | null;
+}
+
+export interface AdvisoryResponse {
+  advisory: Advisory | null;
+  disclaimer: string;
+  /** Why there is no advisory, e.g. none is issued for the destination's country. */
+  note?: string;
+}
+
 export type WeatherIcon =
   'clear' | 'partly-cloudy' | 'cloudy' | 'fog' | 'drizzle' | 'rain' | 'snow' | 'thunder';
 

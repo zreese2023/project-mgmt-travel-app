@@ -1,6 +1,7 @@
 import fastifyPostgres from '@fastify/postgres';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { registerTypeParsers } from './lib/pgTypes.js';
+import { createAdvisoryService } from './lib/advisory.js';
 import { createWeatherService, type FetchLike } from './lib/weather.js';
 import { registerAuth } from './plugins/auth.js';
 import { registerErrorHandling } from './plugins/errors.js';
@@ -16,6 +17,8 @@ export interface AppOptions {
   logger?: boolean;
   /** Override the HTTP client used for the weather API (tests pass a stub). */
   weatherFetch?: FetchLike;
+  /** Override the HTTP client used for the U.S. State Department advisory feed (tests pass a stub). */
+  advisoryFetch?: FetchLike;
 }
 
 export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
@@ -32,6 +35,9 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     cookieSecure: options.cookieSecure ?? false,
   });
 
+  const advisories = createAdvisoryService({
+    fetch: options.advisoryFetch ?? ((url, init) => fetch(url, init)),
+  });
   const weather = createWeatherService({
     fetch: options.weatherFetch ?? ((url, init) => fetch(url, init)),
   });
@@ -43,7 +49,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
         return { status: 'ok', db: rows[0]?.ok === 1 ? 'up' : 'down' };
       });
       await api.register(authRoutes);
-      await api.register(destinationRoutes, { weather });
+      await api.register(destinationRoutes, { weather, advisories });
       await api.register(travelRoutes);
       await api.register(tripRoutes);
     },

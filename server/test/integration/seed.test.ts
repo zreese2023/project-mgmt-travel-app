@@ -12,17 +12,20 @@ describe('TECH-02: schema and sample seed data (real Postgres)', () => {
     await pool.end();
   });
 
-  it('seeds at least 12 destinations, each with 3+ activities and 2+ hotels', async () => {
+  it('seeds at least 12 destinations, each with an advisory, 3+ activities and 2+ hotels', async () => {
     const { rows } = await pool.query<{
       slug: string;
+      advisory: boolean;
       activities: number;
       hotels: number;
     }>(`select d.slug,
+               exists (select 1 from advisories a where a.destination_id = d.id) as advisory,
                (select count(*) from activities a where a.destination_id = d.id) as activities,
                (select count(*) from hotels h where h.destination_id = d.id) as hotels
         from destinations d`);
     expect(rows.length).toBeGreaterThanOrEqual(12);
     for (const row of rows) {
+      expect(row.advisory, `${row.slug} advisory`).toBe(true);
       expect(row.activities, `${row.slug} activities`).toBeGreaterThanOrEqual(3);
       expect(row.hotels, `${row.slug} hotels`).toBeGreaterThanOrEqual(2);
     }

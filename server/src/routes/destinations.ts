@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { getAdvisory, type AdvisoryService } from '../lib/advisory.js';
 import {
   getDestinationBySlug,
   listDestinationFilters,
@@ -10,6 +11,7 @@ import type { TempUnit, WeatherService } from '../lib/weather.js';
 
 interface Deps {
   weather: WeatherService;
+  advisories: AdvisoryService;
 }
 
 export async function destinationRoutes(app: FastifyInstance, deps: Deps): Promise<void> {
@@ -72,4 +74,12 @@ export async function destinationRoutes(app: FastifyInstance, deps: Deps): Promi
       );
     },
   );
+
+  // SCRUM-15: U.S. Department of State advisory for the destination's country, with a
+  // labelled sample fallback when that service cannot be reached.
+  app.get<{ Params: { slug: string } }>('/destinations/:slug/advisory', async (request) => {
+    const destination = await getDestinationBySlug(app.pg.pool, request.params.slug);
+    if (!destination) throw notFound('Destination');
+    return getAdvisory(app.pg.pool, deps.advisories, destination);
+  });
 }

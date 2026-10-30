@@ -1,6 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createTestApp, failingWeatherFetch } from '../helpers/app.js';
+import {
+  createTestApp,
+  failingAdvisoryFetch,
+  failingWeatherFetch,
+  okWeatherFetch,
+} from '../helpers/app.js';
 
 interface Destination {
   slug: string;
@@ -112,6 +117,88 @@ describe('Destination discovery (real Postgres)', () => {
       const res = await app.inject({ method: 'GET', url: '/api/destinations/atlantis' });
       expect(res.statusCode).toBe(404);
       expect(res.json().error.code).toBe('not_found');
+    });
+  });
+
+  describe('SCRUM-15: travel advisories (U.S. State Department feed, stubbed)', () => {
+    it('returns the live State Department advisory for the destination country', async () => {
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/destinations/rio-de-janeiro/advisory',
+      });
+      expect(res.statusCode).toBe(200);
+      const { advisory, disclaimer } = res.json();
+      expect(advisory).toMatchObject({
+        destinationSlug: 'rio-de-janeiro',
+        kind: 'live',
+        level: 2,
+        label: 'Exercise Increased Caution',
+      });
+      expect(advisory.sourceLabel).toMatch(/U\.S\. Department of State/);
+      expect(advisory.sourceLabel).toContain('Updated 2026-10-22');
+      expect(advisory.sourceUrl).toMatch(/^https:\/\/travel\.state\.gov\//);
+      expect(advisory.categories).toEqual(['crime', 'terrorism']);
+      expect(advisory.summary).not.toContain('<');
+      expect(disclaimer).toMatch(/not an official source/i);
+    });
+
+    it('maps every destination whose country the State Department covers', async () => {
+      for (const { slug } of await search()) {
+        const res = await app.inject({ method: 'GET', url: `/api/destinations/${slug}/advisory` });
+        expect(res.statusCode, slug).toBe(200);
+        const { advisory } = res.json();
+        if (slug === 'honolulu') continue; // the United States has no advisory (next test)
+        expect(advisory, slug).not.toBeNull();
+        expect(advisory.kind, slug).toBe('live');
+        expect(advisory.level, slug).toBeGreaterThanOrEqual(1);
+        expect(advisory.level, slug).toBeLessThanOrEqual(4);
+      }
+    });
+
+    it('explains, instead of showing a made-up level, when no advisory is issued for the country', async () => {
+      const res = await app.inject({ method: 'GET', url: '/api/destinations/honolulu/advisory' });
+      expect(res.statusCode).toBe(200);
+      expect(res.json().advisory).toBeNull();
+      expect(res.json().note).toMatch(/does not publish a travel advisory for United States/);
+    });
+
+    it('falls back to the labelled sample data when the State Department cannot be reached', async () => {
+      const offline = await createTestApp(okWeatherFetch, failingAdvisoryFetch);
+      try {
+        const res = await offline.inject({
+          method: 'GET',
+          url: '/api/destinations/rio-de-janeiro/advisory',
+        });
+        expect(res.statusCode).toBe(200);
+        const { advisory, disclaimer } = res.json();
+        expect(advisory).toMatchObject({ kind: 'sample', level: 3, sourceUrl: null });
+        expect(advisory.sourceLabel).toMatch(/not official/i);
+        expect(disclaimer).toMatch(/not official guidance/i);
+      } finally {
+        await offline.close();
+      }
+    });
+
+    it('also falls back when the feed answers with something unusable', async () => {
+      const garbage = await createTestApp(okWeatherFetch, async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({ unexpected: true }),
+      }));
+      try {
+        const res = await garbage.inject({
+          method: 'GET',
+          url: '/api/destinations/paris/advisory',
+        });
+        expect(res.json().advisory.kind).toBe('sample');
+      } finally {
+        await garbage.close();
+      }
+    });
+
+    it('returns 404 for an unknown destination', async () => {
+      const res = await app.inject({ method: 'GET', url: '/api/destinations/atlantis/advisory' });
+      expect(res.statusCode).toBe(404);
     });
   });
 

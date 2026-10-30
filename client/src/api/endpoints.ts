@@ -1,5 +1,6 @@
 import { api, type ApiClient } from './client';
 import type {
+  AdvisoryResponse,
   Airport,
   DestinationDetail,
   DestinationFilterOptions,
@@ -44,6 +45,8 @@ export function createEndpoints(client: ApiClient) {
         client.get<{ destination: DestinationDetail }>(`/destinations/${encodeURIComponent(slug)}`),
       weather: (slug: string, unit: TempUnit) =>
         client.get<Weather>(`/destinations/${encodeURIComponent(slug)}/weather`, { unit }),
+      advisory: (slug: string) =>
+        client.get<AdvisoryResponse>(`/destinations/${encodeURIComponent(slug)}/advisory`),
     },
     travel: {
       airports: () =>

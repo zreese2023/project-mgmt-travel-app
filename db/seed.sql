@@ -1,4 +1,4 @@
--- Wayfarer SAMPLE data: destinations, activities, flights and hotels.
+-- Wayfarer SAMPLE data: destinations, activities, advisories, flights and hotels.
 -- Everything here is fictional or illustrative and is labelled as sample data in the UI.
 -- Flights are generated for the next 90 days relative to CURRENT_DATE; re-run `npm run db:init`
 -- to refresh them (this also resets the database).
@@ -127,6 +127,28 @@ from (values
   ('marrakech', 'Souk Shopping Walk', 'shopping', 'Lanterns, leather and spices in the medina.', 180),
   ('marrakech', 'Atlas Mountains Day Trip', 'adventure', 'Berber villages and waterfalls.', 540)
 ) as a(slug, name, category, description, duration_min)
+join destinations d on d.slug = a.slug;
+
+-- FALLBACK advisories, shown only when the live U.S. State Department feed cannot be reached.
+-- Levels are ILLUSTRATIVE and made up; they are not real travel guidance.
+insert into advisories (destination_id, level, summary, categories)
+select d.id, a.level, a.summary, a.categories
+from (values
+  ('tokyo', 1, 'Sample advisory: normal precautions. Check entry requirements before you travel.', array['entry']),
+  ('paris', 2, 'Sample advisory: increased caution in crowded tourist areas because of petty theft.', array['safety']),
+  ('london', 1, 'Sample advisory: normal precautions.', array['safety']),
+  ('rome', 1, 'Sample advisory: normal precautions. Watch for pickpockets near major sights.', array['safety']),
+  ('barcelona', 2, 'Sample advisory: increased caution for pickpocketing, especially on public transport.', array['safety']),
+  ('reykjavik', 1, 'Sample advisory: normal precautions. Weather can change quickly; check road and aurora forecasts.', array['weather']),
+  ('bangkok', 2, 'Sample advisory: increased caution. Drink only bottled water and check current health notices.', array['health','safety']),
+  ('sydney', 1, 'Sample advisory: normal precautions. Obey beach flags and lifeguard instructions.', array['safety']),
+  ('cape-town', 2, 'Sample advisory: increased caution after dark and when hiking alone.', array['safety']),
+  ('rio-de-janeiro', 3, 'Sample advisory: reconsider non-essential travel to some districts; stay in well-known areas.', array['safety']),
+  ('dubai', 2, 'Sample advisory: increased caution. Strict local laws apply; extreme summer heat.', array['entry','health']),
+  ('honolulu', 1, 'Sample advisory: normal precautions. Respect ocean conditions and hiking closures.', array['safety']),
+  ('cancun', 2, 'Sample advisory: increased caution. Stay in resort areas and use licensed transport.', array['safety']),
+  ('marrakech', 2, 'Sample advisory: increased caution. Agree taxi prices in advance; dress modestly.', array['entry','safety'])
+) as a(slug, level, summary, categories)
 join destinations d on d.slug = a.slug;
 
 -- Three hotels per destination, each with three room types. Prices scale with the

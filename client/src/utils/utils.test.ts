@@ -19,7 +19,13 @@ import {
   stopsLabel,
   titleCase,
 } from './format';
-import { formatTemperature, weatherEmoji, weatherProblem } from './presentation';
+import {
+  advisoryClass,
+  advisorySymbol,
+  formatTemperature,
+  weatherEmoji,
+  weatherProblem,
+} from './presentation';
 
 describe('SCRUM-11: debounce', () => {
   beforeEach(() => vi.useFakeTimers());
@@ -97,6 +103,19 @@ describe('formatting', () => {
 });
 
 describe('SCRUM-14: weather presentation helpers', () => {
+  it('maps advisory levels to CSS classes and symbols, defaulting unknown levels', () => {
+    expect([1, 2, 3, 4].map(advisoryClass)).toEqual([
+      'advisory--level-1',
+      'advisory--level-2',
+      'advisory--level-3',
+      'advisory--level-4',
+    ]);
+    expect(advisoryClass(0)).toBe('advisory--level-1');
+    expect(advisoryClass(9)).toBe('advisory--level-1');
+    expect(advisorySymbol(3)).toBe('!!');
+    expect(advisorySymbol(9)).toBe('i');
+  });
+
   it('formats weather for display', () => {
     expect(formatTemperature(72, 'F')).toBe('72°F');
     expect(weatherEmoji('rain')).toBe('🌧️');

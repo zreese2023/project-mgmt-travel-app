@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../api/client';
-import type { DestinationDetail, Weather } from '../api/types';
+import type { Advisory, DestinationDetail, Weather } from '../api/types';
 
 vi.mock('../api/endpoints', () => ({
-  endpoints: { destinations: { get: vi.fn(), weather: vi.fn() } },
+  endpoints: { destinations: { get: vi.fn(), advisory: vi.fn(), weather: vi.fn() } },
 }));
 
 import { endpoints } from '../api/endpoints';
@@ -49,6 +49,18 @@ const tokyo: DestinationDetail = {
   ],
 };
 
+const advisory: Advisory = {
+  destinationSlug: 'tokyo',
+  level: 1,
+  label: 'Normal precautions',
+  summary: 'Sample advisory: normal precautions.',
+  categories: ['entry'],
+  kind: 'live',
+  sourceLabel: 'U.S. Department of State travel advisory for Japan. Updated 2026-10-22.',
+  sourceUrl: 'https://travel.state.gov/japan.html',
+  updatedAt: '2026-10-23T00:00:00.000Z',
+};
+
 const weather = (unit: 'F' | 'C', temperature: number): Weather => ({
   available: true,
   unit,
@@ -62,6 +74,10 @@ const open = (slug = 'tokyo') =>
 
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.mocked(endpoints.destinations.advisory).mockResolvedValue({
+    advisory,
+    disclaimer: 'Published by the U.S. Department of State. Wayfarer is not an official source.',
+  });
   vi.mocked(endpoints.destinations.get).mockResolvedValue({ destination: tokyo });
   vi.mocked(endpoints.destinations.weather).mockImplementation(async (_slug, unit) =>
     weather(unit, unit === 'F' ? 72 : 22),
@@ -109,6 +125,69 @@ describe('SCRUM-13: destination details', () => {
     await wrapper.get('[role="alert"] button').trigger('click');
     await flushPromises();
     expect(wrapper.get('h1').text()).toBe('Tokyo');
+  });
+});
+
+describe('SCRUM-15: advisory on the destination page', () => {
+  it('shows the State Department advisory banner with its source and the not-official disclaimer', async () => {
+    const { wrapper } = await open();
+    expect(endpoints.destinations.advisory).toHaveBeenCalledWith('tokyo');
+    expect(wrapper.get('[data-testid="advisory-banner"]').text()).toContain(
+      'Level 1: Normal precautions',
+    );
+    expect(wrapper.get('[data-testid="advisory-disclaimer"]').text()).toMatch(
+      /not an official source/i,
+    );
+    expect(wrapper.get('[data-testid="advisory-source"] a').attributes('href')).toBe(
+      'https://travel.state.gov/japan.html',
+    );
+  });
+
+  it('shows a higher level with its own styling', async () => {
+    vi.mocked(endpoints.destinations.advisory).mockResolvedValue({
+      advisory: { ...advisory, level: 3, label: 'Reconsider travel' },
+      disclaimer: 'Illustrative sample data, not official guidance.',
+    });
+    const { wrapper } = await open();
+    const banner = wrapper.get('[data-testid="advisory-banner"]');
+    expect(banner.classes()).toContain('advisory--level-3');
+    expect(banner.text()).toContain('Reconsider travel');
+  });
+
+  it('still renders the page when the advisory cannot be loaded', async () => {
+    vi.mocked(endpoints.destinations.advisory).mockRejectedValue(
+      new ApiError(500, 'internal_error', 'x'),
+    );
+    const { wrapper } = await open();
+    expect(wrapper.find('[data-testid="advisory-banner"]').exists()).toBe(false);
+    expect(wrapper.get('h1').text()).toBe('Tokyo');
+  });
+
+  it('shows a note instead of a banner when the State Department issues no advisory', async () => {
+    vi.mocked(endpoints.destinations.advisory).mockResolvedValue({
+      advisory: null,
+      disclaimer: 'Published by the U.S. Department of State.',
+      note: 'The U.S. Department of State does not publish a travel advisory for United States.',
+    });
+    const { wrapper } = await open();
+    expect(wrapper.find('[data-testid="advisory-banner"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="advisory-note"]').text()).toContain('does not publish');
+  });
+
+  it('labels a fallback advisory as sample data', async () => {
+    vi.mocked(endpoints.destinations.advisory).mockResolvedValue({
+      advisory: {
+        ...advisory,
+        kind: 'sample',
+        sourceUrl: null,
+        updatedAt: null,
+        sourceLabel: 'Illustrative sample data, not official guidance',
+      },
+      disclaimer: 'Illustrative sample data, not official guidance.',
+    });
+    const { wrapper } = await open();
+    expect(wrapper.find('[data-testid="advisory-sample"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="advisory-source"] a').exists()).toBe(false);
   });
 });
 

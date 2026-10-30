@@ -28,7 +28,7 @@ export interface FetchResponseLike {
 }
 export type FetchLike = (
   url: string,
-  init?: { signal?: AbortSignal },
+  init?: { signal?: AbortSignal; headers?: Record<string, string> },
 ) => Promise<FetchResponseLike>;
 
 export const WEATHER_TTL_MS = 10 * 60 * 1000;

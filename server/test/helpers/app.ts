@@ -26,14 +26,54 @@ export const failingWeatherFetch: FetchLike = async () => {
   throw new Error('network down');
 };
 
+/** Entries shaped like the State Department feed; the United States is deliberately absent. */
+const FEED_COUNTRIES: Array<[string, number, string]> = [
+  ['Japan', 1, 'Exercise Normal Precautions'],
+  ['France', 2, 'Exercise Increased Caution'],
+  ['United Kingdom', 2, 'Exercise Increased Caution'],
+  ['Italy', 2, 'Exercise Increased Caution'],
+  ['Spain', 2, 'Exercise Increased Caution'],
+  ['Iceland', 1, 'Exercise Normal Precautions'],
+  ['Thailand', 1, 'Exercise Normal Precautions'],
+  ['Australia', 1, 'Exercise Normal Precautions'],
+  ['South Africa', 2, 'Exercise Increased Caution'],
+  ['Brazil', 2, 'Exercise Increased Caution'],
+  ['United Arab Emirates', 3, 'Reconsider Travel'],
+  ['Mexico Travel Advisory', 2, 'Exercise Increased Caution'],
+  ['Morocco', 2, 'Exercise Increased Caution'],
+];
+
+export const advisoryFeed = FEED_COUNTRIES.map(([country, level, label]) => ({
+  Title: `${country} - Level ${level}: ${label}`,
+  Link: `https://travel.state.gov/content/travel/en/traveladvisories/${country.toLowerCase().replace(/[^a-z]+/g, '-')}.html`,
+  Summary: `${label}<p>in <b>${country.replace(' Travel Advisory', '')} </b>due to <b>crime</b> and <b>terrorism</b>. Read the entire Travel Advisory.</p>`,
+  Category: ['XX'],
+  Updated: '2026-10-22T20:00:00-04:00',
+  Published: '2026-10-22T20:00:00-04:00',
+  id: country,
+}));
+
+/** Stub for the State Department feed: tests must never hit the network. */
+export const okAdvisoryFetch: FetchLike = async () => ({
+  ok: true,
+  status: 200,
+  json: async () => advisoryFeed,
+});
+
+export const failingAdvisoryFetch: FetchLike = async () => {
+  throw new Error('network down');
+};
+
 export async function createTestApp(
   weatherFetch: FetchLike = okWeatherFetch,
+  advisoryFetch: FetchLike = okAdvisoryFetch,
 ): Promise<FastifyInstance> {
   const config = loadConfig();
   const app = await buildApp({
     databaseUrl: config.testDatabaseUrl,
     jwtSecret: config.jwtSecret,
     weatherFetch,
+    advisoryFetch,
   });
   await app.ready();
   return app;
