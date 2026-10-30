@@ -118,3 +118,13 @@ export function toHourMinute(time: string | null): string | null {
 export function isHourMinute(value: string): boolean {
   return /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
 }
+
+/** The note stored on a hotel item; `parseCheckOut` reads the date back when pricing the stay. */
+export function hotelStayNote(checkOut: string): string {
+  return `Check-out ${checkOut}`;
+}
+
+export function parseCheckOut(notes: string | null): string | null {
+  const match = /^Check-out (\d{4}-\d{2}-\d{2})$/.exec(notes ?? '');
+  return match?.[1] ?? null;
+}

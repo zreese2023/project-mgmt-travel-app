@@ -11,6 +11,7 @@ import {
   updateItem,
   type NewItemBody,
 } from '../lib/trips.js';
+import { PAYMENT_METHODS, payForTrip, type PaymentMethod } from '../lib/payments.js';
 
 const idParam = { type: 'integer' } as const;
 
@@ -147,6 +148,31 @@ export async function tripRoutes(app: FastifyInstance): Promise<void> {
         request.body.direction,
       ),
     }),
+  );
+
+  // SCRUM-25: fake checkout, one payment per trip
+  app.post<{ Params: { id: number }; Body: { method: PaymentMethod } }>(
+    '/trips/:id/payment',
+    {
+      schema: {
+        params: { type: 'object', properties: { id: idParam } },
+        body: {
+          type: 'object',
+          required: ['method'],
+          additionalProperties: false,
+          properties: { method: { type: 'string', enum: [...PAYMENT_METHODS] } },
+        },
+      },
+    },
+    async (request, reply) => {
+      const payment = await payForTrip(
+        app.pg.pool,
+        request.user.id,
+        request.params.id,
+        request.body.method,
+      );
+      return reply.status(201).send({ payment });
+    },
   );
 
   app.delete<{ Params: { id: number; itemId: number } }>(

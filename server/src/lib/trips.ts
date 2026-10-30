@@ -4,6 +4,7 @@ import { withTransaction } from './db.js';
 import { AppError, badRequest, notFound } from './errors.js';
 import {
   groupByDay,
+  hotelStayNote,
   insertAt,
   insertionIndex,
   isHourMinute,
@@ -16,6 +17,14 @@ import {
   type MoveDirection,
   type TripSummary,
 } from './itinerary.js';
+import {
+  assertUnpaid,
+  getPayment,
+  getTripCost,
+  tripPaid,
+  type Payment,
+  type TripCost,
+} from './payments.js';
 import type pg from 'pg';
 
 export interface Trip {
@@ -29,12 +38,15 @@ export interface Trip {
 
 export interface TripListEntry extends Trip {
   itemCount: number;
+  paid: boolean;
 }
 
 export interface TripDetail {
   trip: Trip;
   days: DayPlan[];
   summary: TripSummary;
+  cost: TripCost;
+  payment: Payment | null;
 }
 
 export interface NewTripInput {
@@ -223,15 +235,16 @@ export async function createTrip(
 }
 
 export async function listTrips(db: Queryable, userId: number): Promise<TripListEntry[]> {
-  const { rows } = await db.query<TripRow & { item_count: number }>(
+  const { rows } = await db.query<TripRow & { item_count: number; paid: boolean }>(
     `select t.id, t.user_id, t.name, t.start_date, t.end_date, t.created_at, t.destination_id,
             d.slug as destination_slug, d.name as destination_name, d.image_url, d.airport_code,
-            (select count(*) from itinerary_items i where i.trip_id = t.id) as item_count
+            (select count(*) from itinerary_items i where i.trip_id = t.id) as item_count,
+            exists (select 1 from payments p where p.trip_id = t.id) as paid
      from trips t join destinations d on d.id = t.destination_id
      where t.user_id = $1 order by t.start_date, t.id`,
     [userId],
   );
-  return rows.map((row) => ({ ...toTrip(row), itemCount: row.item_count }));
+  return rows.map((row) => ({ ...toTrip(row), itemCount: row.item_count, paid: row.paid }));
 }
 
 export async function getTripDetail(
@@ -249,14 +262,27 @@ export async function getTripDetail(
     trip: toTrip(tripRow),
     days: groupByDay(tripRow.start_date, tripRow.end_date, items),
     summary: summarizeTrip(tripRow.start_date, tripRow.end_date, items),
+    cost: await getTripCost(db, tripId),
+    payment: await getPayment(db, tripId),
   };
 }
 
+const PAID_TRIP_LOCKED = 'This trip has been paid for and can no longer be changed';
+
 export async function deleteTrip(db: Queryable, userId: number, tripId: number): Promise<void> {
-  const { rowCount } = await db.query('delete from trips where id = $1 and user_id = $2', [
-    tripId,
-    userId,
-  ]);
+  let rowCount: number | null;
+  try {
+    ({ rowCount } = await db.query('delete from trips where id = $1 and user_id = $2', [
+      tripId,
+      userId,
+    ]));
+  } catch (err) {
+    // payments.trip_id is ON DELETE RESTRICT, so a paid trip cannot be deleted.
+    if (typeof err === 'object' && err !== null && (err as { code?: string }).code === '23503') {
+      throw tripPaid('A paid trip cannot be deleted');
+    }
+    throw err;
+  }
   if (!rowCount) throw notFound('Trip');
 }
 
@@ -386,7 +412,7 @@ async function resolveItem(
       kind: 'hotel',
       title: `Stay at ${hotel.name}`,
       day: input.checkIn,
-      notes: `Check-out ${input.checkOut}`,
+      notes: hotelStayNote(input.checkOut),
       hotelId: input.hotelId,
     };
   }
@@ -438,6 +464,7 @@ export async function addItem(
 ): Promise<ItineraryItem> {
   return withTransaction(pool, async (db) => {
     const trip = await loadOwnedTrip(db, userId, tripId);
+    await assertUnpaid(db, tripId, PAID_TRIP_LOCKED);
     const item = await resolveItem(db, trip, input);
     const { rows } = await db.query<ItemRow>(
       `insert into itinerary_items (trip_id, kind, title, day, start_time, notes, activity_id, flight_id, hotel_id)
@@ -474,6 +501,7 @@ export async function updateItem(
 ): Promise<ItineraryItem> {
   return withTransaction(pool, async (db) => {
     const trip = await loadOwnedTrip(db, userId, tripId);
+    await assertUnpaid(db, tripId, PAID_TRIP_LOCKED);
     const { rows } = await db.query<ItemRow>(
       `select ${ITEM_COLUMNS} from itinerary_items where id = $1 and trip_id = $2`,
       [itemId, tripId],
@@ -519,6 +547,7 @@ export async function moveItem(
 ): Promise<ItineraryItem> {
   return withTransaction(pool, async (db) => {
     await loadOwnedTrip(db, userId, tripId);
+    await assertUnpaid(db, tripId, PAID_TRIP_LOCKED);
     const { rows } = await db.query<ItemRow>(
       `select ${ITEM_COLUMNS} from itinerary_items where id = $1 and trip_id = $2`,
       [itemId, tripId],
@@ -544,6 +573,7 @@ export async function removeItem(
 ): Promise<void> {
   await withTransaction(pool, async (db) => {
     await loadOwnedTrip(db, userId, tripId);
+    await assertUnpaid(db, tripId, PAID_TRIP_LOCKED);
     const { rows } = await db.query<{ day: string }>(
       'delete from itinerary_items where id = $1 and trip_id = $2 returning day',
       [itemId, tripId],

@@ -127,12 +127,16 @@ onMounted(load);
         {{ trip.destination.name }} · {{ formatDate(trip.startDate) }} to
         {{ formatDate(trip.endDate) }}
       </p>
-      <p class="small">{{ plural(trip.itemCount, 'item') }} planned</p>
+      <p class="small">
+        {{ plural(trip.itemCount, 'item') }} planned
+        <span v-if="trip.paid" class="kind kind--booked" data-testid="trip-paid">Paid</span>
+      </p>
       <div class="row">
         <RouterLink class="button button--small" :to="{ name: 'trip', params: { id: trip.id } }"
           >Open</RouterLink
         >
         <button
+          v-if="!trip.paid"
           type="button"
           class="button--small button--danger"
           @click="remove(trip.id, trip.name)"

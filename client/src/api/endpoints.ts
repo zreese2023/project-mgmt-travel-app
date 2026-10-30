@@ -13,6 +13,8 @@ import type {
   ItineraryItem,
   NewItem,
   NewTrip,
+  Payment,
+  PaymentMethod,
   TempUnit,
   Trip,
   TripDetail,
@@ -75,6 +77,8 @@ export function createEndpoints(client: ApiClient) {
         }),
       removeItem: (tripId: number, itemId: number) =>
         client.delete<void>(`/trips/${tripId}/items/${itemId}`),
+      pay: (tripId: number, method: PaymentMethod) =>
+        client.post<{ payment: Payment }>(`/trips/${tripId}/payment`, { method }),
     },
   };
 }

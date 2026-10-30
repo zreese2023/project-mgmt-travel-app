@@ -28,6 +28,8 @@ interface Detail {
   };
   days: Array<{ day: string; dayNumber: number | null; items: Item[] }>;
   summary: { days: number; items: number; byKind: Record<string, number> };
+  cost: { lines: Array<{ kind: string; amount: number }>; total: number };
+  payment: { amount: number; status: string } | null;
 }
 
 describe('Itinerary (real Postgres)', () => {
@@ -340,6 +342,89 @@ describe('Itinerary (real Postgres)', () => {
       expect((await call('DELETE', `/trips/${id}`, user)).statusCode).toBe(204);
       expect((await call('GET', `/trips/${id}`, user)).statusCode).toBe(404);
       expect((await call('DELETE', `/trips/${id}`, user)).statusCode).toBe(404);
+    });
+  });
+
+  describe('SCRUM-25: pay for a trip', () => {
+    const pay = (tripId: number, method = 'credit_card', who = user) =>
+      call('POST', `/trips/${tripId}/payment`, who, { method });
+
+    const bookedTrip = async (): Promise<{ id: number; total: number }> => {
+      const id = await newTrip();
+      const { outbound } = await findFlights(app, 'JFK', 'NRT', start);
+      const flight = outbound[0] as { id: number; price: number };
+      await addItem(id, { kind: 'flight', flightId: flight.id });
+      const { hotelId, room } = await findHotelRoom(app, 'tokyo', start, end);
+      await addItem(id, { kind: 'hotel', hotelId, checkIn: start, checkOut: end });
+      return { id, total: Math.round((flight.price + room.price.total) * 100) / 100 };
+    };
+
+    it('quotes the trip price from its flights and stays, and charges exactly that', async () => {
+      const { id, total } = await bookedTrip();
+      await addItem(id, { kind: 'note', title: 'Free', day: start });
+      const before = await detail(id);
+      expect(before.cost.total).toBe(total);
+      expect(before.cost.lines.map((l) => l.kind)).toEqual(['flight', 'hotel']);
+      expect(before.payment).toBeNull();
+
+      const res = await pay(id, 'paypal');
+      expect(res.statusCode).toBe(201);
+      expect(res.json().payment).toMatchObject({
+        tripId: id,
+        amount: total,
+        method: 'paypal',
+        status: 'completed',
+      });
+      expect((await detail(id)).payment).toMatchObject({ amount: total, status: 'completed' });
+      const listed = (await call('GET', '/trips', user)).json().trips as Array<{
+        id: number;
+        paid: boolean;
+      }>;
+      expect(listed.find((t) => t.id === id)?.paid).toBe(true);
+    });
+
+    it('accepts only one payment per trip', async () => {
+      const { id } = await bookedTrip();
+      expect((await pay(id)).statusCode).toBe(201);
+      const again = await pay(id, 'debit_card');
+      expect(again.statusCode).toBe(409);
+      expect(again.json().error.code).toBe('trip_paid');
+    });
+
+    it('locks a paid trip: no adding, editing, moving, removing or deleting', async () => {
+      const { id } = await bookedTrip();
+      const itemId = (await detail(id)).days[0]?.items[0]?.id;
+      expect((await pay(id)).statusCode).toBe(201);
+
+      expect((await addItem(id, { kind: 'note', title: 'x', day: start })).statusCode).toBe(409);
+      expect(
+        (await call('PATCH', `/trips/${id}/items/${itemId}`, user, { title: 'x' })).statusCode,
+      ).toBe(409);
+      expect(
+        (await call('POST', `/trips/${id}/items/${itemId}/move`, user, { direction: 'down' }))
+          .statusCode,
+      ).toBe(409);
+      expect((await call('DELETE', `/trips/${id}/items/${itemId}`, user)).statusCode).toBe(409);
+      expect((await call('DELETE', `/trips/${id}`, user)).statusCode).toBe(409);
+      expect((await call('GET', `/trips/${id}`, user)).statusCode).toBe(200);
+    });
+
+    it('refuses to charge for a trip with nothing priced, or with an unknown method', async () => {
+      const id = await newTrip();
+      await addItem(id, { kind: 'note', title: 'Free', day: start });
+      expect((await detail(id)).cost.total).toBe(0);
+      expect((await pay(id)).statusCode).toBe(422);
+      expect((await pay(id, 'bitcoin')).statusCode).toBe(400);
+      expect((await detail(id)).payment).toBeNull();
+    });
+
+    it("cannot pay for another user's trip", async () => {
+      const { id } = await bookedTrip();
+      const other = await registerUser(app, 'Other');
+      expect((await pay(id, 'credit_card', other)).statusCode).toBe(404);
+      expect(
+        (await call('POST', `/trips/${id}/payment`, null, { method: 'paypal' })).statusCode,
+      ).toBe(401);
     });
   });
 

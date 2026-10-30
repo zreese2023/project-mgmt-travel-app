@@ -206,6 +206,7 @@ export interface Trip {
 
 export interface TripListEntry extends Trip {
   itemCount: number;
+  paid: boolean;
 }
 
 export interface DayPlan {
@@ -222,6 +223,24 @@ export interface TripDetail {
     items: number;
     byKind: Record<ItemKind, number>;
   };
+  cost: TripCost;
+  payment: Payment | null;
+}
+
+export type PaymentMethod = 'credit_card' | 'debit_card' | 'paypal';
+
+export interface Payment {
+  id: number;
+  tripId: number;
+  amount: number;
+  method: PaymentMethod;
+  status: 'pending' | 'completed' | 'failed';
+  createdAt: string;
+}
+
+export interface TripCost {
+  lines: Array<{ itemId: number; kind: 'flight' | 'hotel'; title: string; amount: number }>;
+  total: number;
 }
 
 export type NewItem =
