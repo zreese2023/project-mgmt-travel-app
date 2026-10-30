@@ -31,6 +31,8 @@ export const useTripsStore = defineStore('trips', () => {
   const activeTripId = ref<number | null>(readStored());
 
   const activeTrip = computed(() => trips.value.find((t) => t.id === activeTripId.value) ?? null);
+  /** Trips that can still take flights and hotels (paid trips are locked). */
+  const openTrips = computed(() => trips.value.filter((t) => !t.paid));
 
   function setActive(id: number | null): void {
     activeTripId.value = id;
@@ -40,12 +42,12 @@ export const useTripsStore = defineStore('trips', () => {
   async function load(): Promise<void> {
     trips.value = (await endpoints.trips.list()).trips;
     loaded.value = true;
-    // Forget a stored selection that no longer exists; default to the only trip if there is one.
-    if (activeTripId.value !== null && !trips.value.some((t) => t.id === activeTripId.value)) {
+    // Forget a stored selection that no longer exists or was paid for; default to the only open trip.
+    if (activeTripId.value !== null && !openTrips.value.some((t) => t.id === activeTripId.value)) {
       setActive(null);
     }
-    if (activeTripId.value === null && trips.value.length === 1) {
-      setActive((trips.value[0] as TripListEntry).id);
+    if (activeTripId.value === null && openTrips.value.length === 1) {
+      setActive((openTrips.value[0] as TripListEntry).id);
     }
   }
 
@@ -55,5 +57,5 @@ export const useTripsStore = defineStore('trips', () => {
     setActive(null);
   }
 
-  return { trips, loaded, activeTripId, activeTrip, setActive, load, clear };
+  return { trips, openTrips, loaded, activeTripId, activeTrip, setActive, load, clear };
 });

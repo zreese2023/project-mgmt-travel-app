@@ -33,6 +33,7 @@ const trip = (id: number): TripListEntry => ({
   endDate: '2026-11-08',
   createdAt: '2026-10-21T00:00:00.000Z',
   itemCount: 0,
+  paid: false,
 });
 
 beforeEach(() => {
@@ -146,6 +147,17 @@ describe('SCRUM-31: trips store', () => {
     await store.load();
     expect(store.activeTripId).toBeNull();
     expect(localStorage.getItem('wayfarer.activeTrip')).toBeNull();
+  });
+
+  it('never selects a paid trip: it forgets a stored one and defaults to the only open trip', async () => {
+    localStorage.setItem('wayfarer.activeTrip', '1');
+    vi.mocked(endpoints.trips.list).mockResolvedValue({
+      trips: [{ ...trip(1), paid: true }, trip(2)],
+    });
+    const store = useTripsStore();
+    await store.load();
+    expect(store.openTrips.map((t) => t.id)).toEqual([2]);
+    expect(store.activeTripId).toBe(2);
   });
 
   it('works in memory when localStorage throws', async () => {

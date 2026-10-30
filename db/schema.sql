@@ -123,3 +123,16 @@ create table itinerary_items (
   hotel_id    integer references hotels (id)
 );
 create index itinerary_items_trip_idx on itinerary_items (trip_id, day, position);
+
+-- Payments table for tracking trip payments
+-- It's just kind of a fake payment though for the
+create table payments (
+  id        integer generated always as identity primary key,
+  trip_id   integer not null references trips (id) on delete restrict,
+  amount    numeric(10,2) not null check (amount >= 0),
+  method    text not null check (method in ('credit_card', 'debit_card', 'paypal')),
+  status    text not null default 'pending' check (status in ('pending', 'completed', 'failed')),
+  created_at timestamptz not null default now()
+);
+
+create unique index payments_trip_unique_idx on payments (trip_id);

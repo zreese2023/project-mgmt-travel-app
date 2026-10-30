@@ -16,15 +16,20 @@ const selected = computed({
 <template>
   <div class="card" data-testid="trip-picker">
     <template v-if="auth.isAuthenticated">
-      <div v-if="trips.trips.length > 0" class="row">
+      <div v-if="trips.openTrips.length > 0" class="row">
         <label for="trip-select" style="margin: 0">Add selections to trip:</label>
         <select id="trip-select" v-model="selected" style="max-width: 320px">
           <option value="">Choose a trip…</option>
-          <option v-for="trip in trips.trips" :key="trip.id" :value="trip.id">
+          <option v-for="trip in trips.openTrips" :key="trip.id" :value="trip.id">
             {{ trip.name }} ({{ formatDate(trip.startDate) }} to {{ formatDate(trip.endDate) }})
           </option>
         </select>
       </div>
+      <p v-else-if="trips.trips.length > 0" class="small">
+        All your trips are paid for.
+        <RouterLink :to="{ name: 'trips' }">Create a new one</RouterLink>
+        to add more flights and hotels.
+      </p>
       <p v-else class="small">
         You have no trips yet. <RouterLink :to="{ name: 'trips' }">Create one</RouterLink> to add
         flights and hotels to an itinerary.

@@ -3,10 +3,17 @@ import { computed, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import { ApiError } from '../api/client';
 import { endpoints } from '../api/endpoints';
-import type { Activity, ItineraryItem, TripDetail } from '../api/types';
+import type { Activity, ItineraryItem, PaymentMethod, TripDetail } from '../api/types';
 import { useTripsStore } from '../stores/trips';
 import { errorMessage, fieldErrors } from '../utils/errors';
-import { formatClock, formatDate, formatDuration, plural, titleCase } from '../utils/format';
+import {
+  formatClock,
+  formatDate,
+  formatDuration,
+  formatMoney,
+  plural,
+  titleCase,
+} from '../utils/format';
 
 const route = useRoute();
 const trips = useTripsStore();
@@ -38,13 +45,24 @@ const editDay = ref('');
 const editTime = ref('');
 const editNotes = ref('');
 
+// Payment (fake checkout: the server prices the trip and records the payment)
+const PAYMENT_METHODS: Record<PaymentMethod, string> = {
+  credit_card: 'Credit card',
+  debit_card: 'Debit card',
+  paypal: 'PayPal',
+};
+const payMethod = ref<PaymentMethod>('credit_card');
+const paying = ref(false);
+
 const tripDays = computed(() => detail.value?.days.filter((d) => d.dayNumber !== null) ?? []);
 
 async function load(): Promise<void> {
   error.value = null;
   try {
     detail.value = await endpoints.trips.get(tripId.value);
-    trips.setActive(tripId.value);
+    // Opening a trip makes it the one flight/hotel selections go to, unless it is locked.
+    if (!detail.value.payment) trips.setActive(tripId.value);
+    else if (trips.activeTripId === tripId.value) trips.setActive(null);
     if (!newDay.value) newDay.value = detail.value.trip.startDate;
     if (!suggestDay.value) suggestDay.value = detail.value.trip.startDate;
     if (suggestions.value.length === 0) {
@@ -143,6 +161,21 @@ async function move(item: ItineraryItem, direction: 'up' | 'down'): Promise<void
   }
 }
 
+async function pay(): Promise<void> {
+  paying.value = true;
+  message.value = null;
+  try {
+    await endpoints.trips.pay(tripId.value, payMethod.value);
+    message.value = { kind: 'success', text: 'Payment complete. Your trip is booked.' };
+    await load();
+    await trips.load();
+  } catch (err) {
+    message.value = { kind: 'error', text: errorMessage(err) };
+  } finally {
+    paying.value = false;
+  }
+}
+
 onMounted(load);
 </script>
 
@@ -168,7 +201,7 @@ onMounted(load);
           · {{ formatDate(detail.trip.startDate) }} to {{ formatDate(detail.trip.endDate) }}
         </p>
       </div>
-      <div class="row">
+      <div v-if="!detail.payment" class="row">
         <RouterLink
           class="button"
           :to="{
@@ -206,11 +239,65 @@ onMounted(load);
       Your itinerary is saved to your account automatically.
     </section>
 
+    <section class="card" aria-label="Payment" data-testid="payment">
+      <h2>Payment</h2>
+      <p v-if="detail.payment" data-testid="payment-receipt">
+        <span class="kind kind--booked">Paid</span>
+        {{ formatMoney(detail.payment.amount) }} by {{ PAYMENT_METHODS[detail.payment.method] }} on
+        {{ formatDate(detail.payment.createdAt.slice(0, 10)) }} · Receipt #{{ detail.payment.id }}.
+        This trip is locked and can no longer be changed.
+      </p>
+      <template v-else>
+        <p v-if="detail.cost.lines.length === 0" class="muted small">
+          Add a flight or hotel to this trip to see its price.
+        </p>
+        <ul v-else class="timeline">
+          <li
+            v-for="line in detail.cost.lines"
+            :key="line.itemId"
+            class="timeline__item"
+            style="grid-template-columns: 1fr auto"
+            data-testid="cost-line"
+          >
+            <div>
+              <span class="kind">{{ line.kind }}</span
+              >{{ line.title }}
+            </div>
+            <strong>{{ formatMoney(line.amount) }}</strong>
+          </li>
+        </ul>
+        <form class="row row--between" aria-label="Pay for trip" @submit.prevent="pay">
+          <strong data-testid="cost-total">Total: {{ formatMoney(detail.cost.total) }}</strong>
+          <div class="row">
+            <label for="pay-method" class="small">Pay with</label>
+            <select id="pay-method" v-model="payMethod">
+              <option v-for="(label, value) in PAYMENT_METHODS" :key="value" :value="value">
+                {{ label }}
+              </option>
+            </select>
+            <button
+              type="submit"
+              class="primary"
+              :disabled="paying || detail.cost.total <= 0"
+              data-testid="pay"
+            >
+              {{ paying ? 'Paying…' : 'Pay now' }}
+            </button>
+          </div>
+        </form>
+        <p class="muted small">
+          Sample prices: flights for one passenger, stays in the cheapest room including tax. No
+          real payment is taken. Once paid, the trip can no longer be changed.
+        </p>
+      </template>
+    </section>
+
     <div v-if="message" class="alert" :class="`alert--${message.kind}`" role="status">
       {{ message.text }}
     </div>
 
     <div
+      v-if="!detail.payment"
       class="grid"
       style="margin-top: 1rem; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr))"
     >
@@ -332,7 +419,7 @@ onMounted(load);
               <button type="button" class="button--small" @click="editingId = null">Cancel</button>
             </div>
           </form>
-          <div v-if="editingId !== item.id" class="row">
+          <div v-if="editingId !== item.id && !detail.payment" class="row">
             <button
               type="button"
               class="button--small"

@@ -13,6 +13,7 @@ vi.mock('../api/endpoints', () => ({
       removeItem: vi.fn(),
       updateItem: vi.fn(),
       moveItem: vi.fn(),
+      pay: vi.fn(),
     },
     destinations: { search: vi.fn(), get: vi.fn() },
   },
@@ -32,6 +33,7 @@ const tripEntry: TripListEntry = {
   endDate: '2026-11-06',
   createdAt: '2026-10-21T00:00:00.000Z',
   itemCount: 2,
+  paid: false,
 };
 
 const item = (id: number, overrides: object = {}) => ({
@@ -68,7 +70,21 @@ const detail = (): TripDetail => ({
     { day: '2026-11-06', dayNumber: 2, items: [] },
   ],
   summary: { days: 2, items: 3, byKind: { flight: 1, hotel: 0, activity: 2, note: 0 } },
+  cost: {
+    lines: [{ itemId: 3, kind: 'flight', title: 'Flight SK100: JFK to NRT', amount: 512.4 }],
+    total: 512.4,
+  },
+  payment: null,
 });
+
+const payment = {
+  id: 42,
+  tripId: 3,
+  amount: 512.4,
+  method: 'paypal' as const,
+  status: 'completed' as const,
+  createdAt: '2026-10-22T10:00:00.000Z',
+};
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -367,5 +383,68 @@ describe('SCRUM-31/32: itinerary page', () => {
     await wrapper.get('[role="alert"] button').trigger('click');
     await flushPromises();
     expect(wrapper.find('[data-testid="day"]').exists()).toBe(true);
+  });
+});
+
+describe('SCRUM-25: paying for a trip', () => {
+  const open = () =>
+    mountWithApp(TripDetailView, { location: { name: 'trip', params: { id: '3' } } });
+
+  it('shows the price of the trip and pays with the chosen method', async () => {
+    vi.mocked(endpoints.trips.pay).mockResolvedValue({ payment });
+    const { wrapper } = await open();
+    expect(wrapper.findAll('[data-testid="cost-line"]')).toHaveLength(1);
+    expect(wrapper.get('[data-testid="cost-total"]').text()).toContain('$512.40');
+
+    await wrapper.get('#pay-method').setValue('paypal');
+    await wrapper.get('form[aria-label="Pay for trip"]').trigger('submit');
+    await flushPromises();
+    expect(endpoints.trips.pay).toHaveBeenCalledWith(3, 'paypal');
+    expect(endpoints.trips.get).toHaveBeenCalledTimes(2);
+    expect(endpoints.trips.list).toHaveBeenCalled(); // picker drops the now-paid trip
+    expect(wrapper.get('[role="status"]').text()).toContain('Payment complete');
+  });
+
+  it('cannot pay while there is nothing priced', async () => {
+    vi.mocked(endpoints.trips.get).mockResolvedValue({
+      ...detail(),
+      cost: { lines: [], total: 0 },
+    });
+    const { wrapper } = await open();
+    expect(wrapper.get('[data-testid="payment"]').text()).toContain('Add a flight or hotel');
+    expect(wrapper.get('[data-testid="pay"]').attributes('disabled')).toBeDefined();
+  });
+
+  it('shows the server error when payment fails', async () => {
+    vi.mocked(endpoints.trips.pay).mockRejectedValue(
+      new ApiError(409, 'trip_paid', 'This trip has already been paid for'),
+    );
+    const { wrapper } = await open();
+    await wrapper.get('form[aria-label="Pay for trip"]').trigger('submit');
+    await flushPromises();
+    expect(wrapper.get('[role="status"]').text()).toContain('already been paid for');
+  });
+
+  it('shows the receipt and locks a paid trip', async () => {
+    vi.mocked(endpoints.trips.get).mockResolvedValue({ ...detail(), payment });
+    const { wrapper } = await open();
+    const receipt = wrapper.get('[data-testid="payment-receipt"]').text();
+    expect(receipt).toContain('$512.40');
+    expect(receipt).toContain('PayPal');
+    expect(receipt).toContain('Receipt #42');
+    expect(wrapper.find('form[aria-label="Pay for trip"]').exists()).toBe(false);
+    expect(wrapper.find('form[aria-label="Add to itinerary"]').exists()).toBe(false);
+    expect(wrapper.find('button[aria-label="Remove Breakfast"]').exists()).toBe(false);
+    expect(wrapper.findAll('a').some((a) => a.attributes('href')?.includes('/flights'))).toBe(
+      false,
+    );
+  });
+
+  it('marks paid trips in the list and does not offer to delete them', async () => {
+    vi.mocked(endpoints.trips.list).mockResolvedValue({ trips: [{ ...tripEntry, paid: true }] });
+    const { wrapper } = await mountWithApp(TripsView, { location: '/trips' });
+    const card = wrapper.get('[data-testid="trip-card"]');
+    expect(card.find('[data-testid="trip-paid"]').exists()).toBe(true);
+    expect(card.find('.button--danger').exists()).toBe(false);
   });
 });
