@@ -1,6 +1,6 @@
 import { isIsoDate, nightsBetween, todayIso } from './dates.js';
 import type { Queryable } from './db.js';
-import { badRequest } from './errors.js';
+import { badRequest, notFound } from './errors.js';
 import { hotelPrice, type PriceBreakdown } from './pricing.js';
 
 export type HotelSort = 'price' | 'rating';
@@ -9,6 +9,7 @@ export const MAX_GUESTS_PER_ROOM = 8;
 
 export interface HotelSearchParams {
   destination?: string | undefined;
+  hotelId?: number | undefined;
   checkIn: string;
   checkOut: string;
   guests?: number | undefined;
@@ -93,6 +94,7 @@ export function buildHotelQuery(params: HotelSearchParams): { text: string; valu
   };
 
   if (params.destination) where.push(`d.slug = ${param(params.destination)}`);
+  if (params.hotelId !== undefined) where.push(`h.id = ${param(params.hotelId)}`);
   if (params.guests !== undefined) where.push(`r.capacity >= ${param(params.guests)}`);
   if (params.minPrice !== undefined) where.push(`r.nightly_price >= ${param(params.minPrice)}`);
   if (params.maxPrice !== undefined) where.push(`r.nightly_price <= ${param(params.maxPrice)}`);
@@ -168,4 +170,19 @@ export async function searchHotels(
   const { text, values } = buildHotelQuery(params);
   const { rows } = await db.query<HotelRoomRow>(text, values);
   return groupHotelRows(rows, nights, params.sort);
+}
+
+/** One hotel with every room priced for the stay; the first step of hotel checkout (SCRUM-16). */
+export async function getHotel(
+  db: Queryable,
+  hotelId: number,
+  stay: { checkIn: string; checkOut: string },
+  today: string = todayIso(),
+): Promise<HotelResult> {
+  const nights = validateStay(stay.checkIn, stay.checkOut, undefined, today);
+  const { text, values } = buildHotelQuery({ ...stay, hotelId });
+  const { rows } = await db.query<HotelRoomRow>(text, values);
+  const hotel = groupHotelRows(rows, nights)[0];
+  if (!hotel) throw notFound('Hotel');
+  return hotel;
 }

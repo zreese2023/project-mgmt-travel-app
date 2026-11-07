@@ -24,6 +24,8 @@ export function createTestRouter(): Router {
       ...names.map((name) => ({ path: name === 'home' ? '/' : `/${name}`, name, component: Stub })),
       { path: '/destinations/:slug', name: 'destination', component: Stub },
       { path: '/trips/:id', name: 'trip', component: Stub },
+      { path: '/checkout/flight', name: 'checkout-flight', component: Stub },
+      { path: '/checkout/hotel', name: 'checkout-hotel', component: Stub },
     ],
   });
 }

@@ -1,12 +1,10 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { endpoints } from '../api/endpoints';
-import type { DestinationSummary, Hotel } from '../api/types';
+import type { DestinationSummary, Hotel, RoomOption } from '../api/types';
 import HotelCard from '../components/HotelCard.vue';
 import SampleDataNotice from '../components/SampleDataNotice.vue';
-import TripPicker from '../components/TripPicker.vue';
-import { useTripsStore } from '../stores/trips';
 import { addDays, defaultDates } from '../utils/dates';
 import { errorMessage, fieldErrors } from '../utils/errors';
 import { plural, titleCase } from '../utils/format';
@@ -14,7 +12,7 @@ import { plural, titleCase } from '../utils/format';
 const AMENITIES = ['wifi', 'pool', 'spa', 'gym', 'breakfast', 'bar'];
 
 const route = useRoute();
-const trips = useTripsStore();
+const router = useRouter();
 
 const queryString = (key: string): string =>
   typeof route.query[key] === 'string' ? (route.query[key] as string) : '';
@@ -35,13 +33,11 @@ const searched = ref(false);
 const loading = ref(false);
 const error = ref<string | null>(null);
 const errors = ref<Record<string, string>>({});
-const message = ref<{ kind: 'success' | 'error'; text: string } | null>(null);
 
 async function search(): Promise<void> {
   loading.value = true;
   error.value = null;
   errors.value = {};
-  message.value = null;
   try {
     const result = await endpoints.travel.hotels({
       destination: destination.value,
@@ -65,20 +61,18 @@ async function search(): Promise<void> {
   }
 }
 
-async function addToTrip(hotel: Hotel): Promise<void> {
-  message.value = null;
-  if (!trips.activeTripId) return;
-  try {
-    await endpoints.trips.addItem(trips.activeTripId, {
-      kind: 'hotel',
-      hotelId: hotel.id,
+/** SCRUM-16: hand the room to the checkout (sign-in is asked for there if needed). */
+function book(hotel: Hotel, room: RoomOption): void {
+  void router.push({
+    name: 'checkout-hotel',
+    query: {
+      hotel: String(hotel.id),
+      room: String(room.id),
       checkIn: checkIn.value,
       checkOut: checkOut.value,
-    });
-    message.value = { kind: 'success', text: `Added ${hotel.name} to your trip.` };
-  } catch (err) {
-    message.value = { kind: 'error', text: errorMessage(err) };
-  }
+      guests: String(guests.value),
+    },
+  });
 }
 
 onMounted(async () => {
@@ -156,22 +150,12 @@ onMounted(async () => {
   </form>
 
   <div v-if="error" class="alert alert--error" role="alert">{{ error }}</div>
-  <div v-if="message" class="alert" :class="`alert--${message.kind}`" role="status">
-    {{ message.text }}
-  </div>
 
   <template v-if="searched">
-    <TripPicker />
     <p class="muted small">{{ plural(hotels.length, 'hotel') }} found. {{ note }}</p>
     <p v-if="hotels.length === 0" class="status" data-testid="no-hotels">
       No hotels match those dates and filters. Try different dates or remove a filter.
     </p>
-    <HotelCard
-      v-for="hotel in hotels"
-      :key="hotel.id"
-      :hotel="hotel"
-      :can-add-to-trip="trips.activeTripId !== null"
-      @add-to-trip="addToTrip"
-    />
+    <HotelCard v-for="hotel in hotels" :key="hotel.id" :hotel="hotel" @book="book" />
   </template>
 </template>

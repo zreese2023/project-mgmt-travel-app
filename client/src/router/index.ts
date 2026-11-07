@@ -34,6 +34,18 @@ export const routes: RouteRecordRaw[] = [
     meta: { title: 'Hotels' },
   },
   {
+    path: '/checkout/flight',
+    name: 'checkout-flight',
+    component: () => import('../views/FlightCheckoutView.vue'),
+    meta: { requiresAuth: true, title: 'Book flights' },
+  },
+  {
+    path: '/checkout/hotel',
+    name: 'checkout-hotel',
+    component: () => import('../views/HotelCheckoutView.vue'),
+    meta: { requiresAuth: true, title: 'Book a hotel' },
+  },
+  {
     path: '/trips',
     name: 'trips',
     component: () => import('../views/TripsView.vue'),

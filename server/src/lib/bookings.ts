@@ -4,7 +4,7 @@ import type { Queryable } from './db.js';
 import { badRequest, notFound } from './errors.js';
 import { validateStay } from './hotels.js';
 import { hotelStayNote, parseCheckOut } from './itinerary.js';
-import { priceTrip, type CostRow } from './payments.js';
+import { COST_COLUMNS, COST_JOINS, priceTrip, type CostRow } from './payments.js';
 import { removeItem, updateItem } from './trips.js';
 
 /**
@@ -30,6 +30,8 @@ export interface Booking {
   /** Hotel nights; null for flights. */
   nights: number | null;
   amount: number;
+  /** What was booked at checkout (passengers, room); null for items added without checkout. */
+  detail: string | null;
   status: BookingStatus;
   paidAt: string | null;
   isPast: boolean;
@@ -57,7 +59,7 @@ const STATUS_RANK: Record<BookingStatus, number> = { planned: 0, confirmed: 1 };
 /** Shapes database rows into bookings; `today` decides which are past. Pure. */
 export function toBookings(rows: readonly BookingRow[], today: string): Booking[] {
   return rows.map((row) => {
-    const amount = priceTrip([row]).lines[0]?.amount ?? 0;
+    const line = priceTrip([row]).lines[0];
     const endDate = row.kind === 'hotel' ? (parseCheckOut(row.notes) ?? row.day) : row.day;
     const status: BookingStatus = row.paid_at ? 'confirmed' : 'planned';
     const isPast = endDate < today;
@@ -71,7 +73,8 @@ export function toBookings(rows: readonly BookingRow[], today: string): Booking[
       startDate: row.day,
       endDate,
       nights: row.kind === 'hotel' ? Math.max(1, nightsBetween(row.day, endDate)) : null,
-      amount,
+      amount: line?.amount ?? 0,
+      detail: line?.detail ?? null,
       status,
       paidAt: row.paid_at ? row.paid_at.toISOString() : null,
       isPast,
@@ -114,14 +117,12 @@ export function sortBookings(
 }
 
 const BOOKING_SELECT = `
-  select i.id as item_id, i.trip_id, t.name as trip_name, d.name as destination_name,
-         i.kind, i.title, i.day, i.notes, f.price as flight_price,
-         (select min(r.nightly_price) from room_types r where r.hotel_id = i.hotel_id) as nightly_price,
+  select ${COST_COLUMNS}, i.trip_id, t.name as trip_name, d.name as destination_name,
          p.created_at as paid_at
   from itinerary_items i
   join trips t on t.id = i.trip_id
   join destinations d on d.id = t.destination_id
-  left join flights f on f.id = i.flight_id
+  ${COST_JOINS}
   left join payments p on p.trip_id = t.id
   where t.user_id = $1 and i.kind in ('flight', 'hotel')`;
 

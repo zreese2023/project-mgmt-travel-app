@@ -1,14 +1,13 @@
 <script setup lang="ts">
-import type { Hotel } from '../api/types';
+import type { Hotel, RoomOption } from '../api/types';
 import { formatMoney, plural, titleCase } from '../utils/format';
 
 defineProps<{
   hotel: Hotel;
-  canAddToTrip: boolean;
 }>();
 
 defineEmits<{
-  addToTrip: [hotel: Hotel];
+  book: [hotel: Hotel, room: RoomOption];
 }>();
 </script>
 
@@ -45,25 +44,22 @@ defineEmits<{
           <strong>{{ room.name }}</strong>
           <span class="muted small"> · sleeps {{ room.capacity }}</span>
         </div>
-        <div class="small">
-          {{ formatMoney(room.nightlyPrice) }} a night ·
-          <strong>{{ formatMoney(room.price.total) }}</strong> total
+        <div class="row small">
+          <span>
+            {{ formatMoney(room.nightlyPrice) }} a night ·
+            <strong>{{ formatMoney(room.price.total) }}</strong> total
+          </span>
+          <button
+            type="button"
+            class="primary button--small"
+            :aria-label="`Book ${room.name} at ${hotel.name}`"
+            data-testid="book-room"
+            @click="$emit('book', hotel, room)"
+          >
+            Book
+          </button>
         </div>
       </div>
-      <p>
-        <button
-          type="button"
-          class="primary button--small"
-          :disabled="!canAddToTrip"
-          data-testid="add-hotel"
-          @click="$emit('addToTrip', hotel)"
-        >
-          Add to trip
-        </button>
-        <span v-if="!canAddToTrip" class="muted small">
-          Choose a trip above to add this hotel.</span
-        >
-      </p>
     </div>
   </article>
 </template>

@@ -151,7 +151,7 @@ from (values
 ) as a(slug, level, summary, categories)
 join destinations d on d.slug = a.slug;
 
--- Three hotels per destination, each with three room types. Prices scale with the
+-- Three hotels per destination, each with four room types. Prices scale with the
 -- destination's average daily cost so budget cities have cheaper rooms.
 insert into hotels (destination_id, name, rating, amenities, address, image_url)
 select d.id, d.name || ' ' || t.suffix, t.rating, t.amenities, t.street || ', ' || d.name, d.image_url
@@ -168,8 +168,9 @@ select h.id, r.name, r.capacity,
 from hotels h
 join destinations d on d.id = h.destination_id
 cross join (values
-  ('Standard Room', 2, 1.00),
-  ('Deluxe Room', 3, 1.35),
+  ('Single King', 2, 1.00),
+  ('Double Queen', 4, 1.20),
+  ('Deluxe King', 2, 1.45),
   ('Suite', 4, 2.10)
 ) as r(name, capacity, factor);
 

@@ -239,8 +239,17 @@ export interface Payment {
   createdAt: string;
 }
 
+export interface CostLine {
+  itemId: number;
+  kind: 'flight' | 'hotel';
+  title: string;
+  amount: number;
+  /** What was booked at checkout, e.g. "2 passengers · 1 checked bag". */
+  detail?: string;
+}
+
 export interface TripCost {
-  lines: Array<{ itemId: number; kind: 'flight' | 'hotel'; title: string; amount: number }>;
+  lines: CostLine[];
   total: number;
 }
 
@@ -272,6 +281,8 @@ export interface Booking {
   endDate: string;
   nights: number | null;
   amount: number;
+  /** What was booked at checkout (passengers, room); null for items added without checkout. */
+  detail: string | null;
   status: 'planned' | 'confirmed';
   paidAt: string | null;
   isPast: boolean;
@@ -291,4 +302,82 @@ export interface AppNotification {
   body: string;
   read: boolean;
   createdAt: string;
+}
+
+// ---- Checkout (SCRUM-15 flights, SCRUM-16 hotels) ----
+
+export type SeatPreference = 'no_preference' | 'window' | 'aisle' | 'middle';
+
+export interface Passenger {
+  fullName: string;
+  dateOfBirth: string;
+  seat: SeatPreference;
+  checkedBags: number;
+}
+
+export interface FlightCheckout {
+  /** The outbound flight, then the return flight for a round trip. */
+  flightIds: number[];
+  passengers: Passenger[];
+}
+
+export interface FlightLegPrice {
+  passengers: number;
+  fare: number;
+  taxes: number;
+  checkedBags: number;
+  baggage: number;
+  total: number;
+}
+
+export interface FlightQuote {
+  legs: Array<{ flight: Flight; price: FlightLegPrice }>;
+  passengers: Passenger[];
+  total: number;
+}
+
+export type RoomRequest =
+  | 'early_check_in'
+  | 'late_check_out'
+  | 'high_floor'
+  | 'quiet_room'
+  | 'accessible_room'
+  | 'extra_bed'
+  | 'crib';
+
+export interface GuestContact {
+  fullName: string;
+  email: string;
+  phone: string;
+}
+
+export interface HotelCheckout {
+  hotelId: number;
+  roomTypeId: number;
+  checkIn: string;
+  checkOut: string;
+  rooms: number;
+  guests: number;
+  requests: RoomRequest[];
+}
+
+export interface HotelBill {
+  nights: number;
+  rooms: number;
+  nightlyPrice: number;
+  roomSubtotal: number;
+  fees: Array<{ request: RoomRequest; amount: number }>;
+  subtotal: number;
+  taxes: number;
+  total: number;
+}
+
+export interface HotelQuote {
+  hotel: { id: number; name: string; address: string; destinationName: string };
+  room: { id: number; name: string; capacity: number; nightlyPrice: number };
+  checkIn: string;
+  checkOut: string;
+  guests: number;
+  requests: RoomRequest[];
+  bill: HotelBill;
 }
