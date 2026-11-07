@@ -86,9 +86,9 @@ Story IDs missing from the source numbering (SCRUM-16..20, SCRUM-28..30) are not
 | SCRUM-22 | Book Flight | UC-02 | 5 | Must | 1 | Descoped |
 | SCRUM-23 | Search hotels | UC-03 | 3 | Must | 1 | In Review |
 | SCRUM-24 | Book Hotel | UC-03 | 3 | Must | 1 | Descoped |
-| SCRUM-25 | Make Payment | UC-08 | 5 | Must | 1 | Descoped |
+| SCRUM-25 | Make Payment | UC-08 | 5 | Must | 1 | Descoped (a trip-level fake payment was later added by a teammate, PR #1; not yet reviewed against SCRUM-25's AC) |
 | SCRUM-27 | Booking Confirmation | UC-08, UC-09 | 2 | Must | 1 | Descoped |
-| SCRUM-26 | Manage Bookings | UC-07 | 5 | Must | 2 | To Do |
+| SCRUM-26 | Manage Bookings | UC-07 | 5 | Must | 2 | In Review |
 | SCRUM-37 | Cancel a booking with refund (**Derived**) | UC-07 | 3 | Must | 2 | To Do |
 
 **SCRUM-21: Search Flights.** As a traveler, I want to search flights by date and destination so I can compare options.
@@ -134,8 +134,8 @@ Story IDs missing from the source numbering (SCRUM-16..20, SCRUM-28..30) are not
 | SCRUM-34 | Manage Profile (Sprint 1: register, sign in and out only) | UC-10 | 5 | Must | 1 | In Review |
 | SCRUM-36 | Reorder itinerary: drag and drop + keyboard (**Derived**) | UC-04 | 5 | Must | 2 | To Do |
 | SCRUM-38 | Export itinerary to PDF (**Derived**) | UC-04 | 3 | Must | 2 | To Do |
-| SCRUM-33 | Receive alerts | UC-09 | 5 | Should | 2 | To Do |
-| SCRUM-35 | View Past Trips | UC-10 | 2 | Should | 2 | To Do |
+| SCRUM-33 | Receive alerts | UC-09 | 5 | Should | 2 | In Review |
+| SCRUM-35 | View Past Trips | UC-10 | 2 | Should | 2 | In Review |
 | SCRUM-43 | Saved payment methods (**Derived**) | UC-10 | 3 | Could | 2 | To Do |
 
 **SCRUM-31: Create Itinerary.** As a traveler, I want to create a personalized itinerary so I can plan my trip by the day.
@@ -233,4 +233,5 @@ Each needs your decision or a veto. "Proposed" is what I will implement if you a
 | 2026-10-22 | **Second descoping pass, to match ConOps 5.1 exactly:** removed the travel advisory banner, API and seed data (SCRUM-15, not in the 5.1 list), itinerary item editing (5.1 says add or remove) and the trip rename/date-change API. Kept: accounts, destination search and filters and details, flight and hotel search with Add to trip, add/remove itinerary builder (plus create, list and delete trip), weather popup and panel. | PM pasted ConOps 5.1 as the Sprint 1 definition. |
 | 2026-10-29 | **PM approved SCRUM-32 (edit itinerary) and SCRUM-12 (filter destinations) for Sprint 1.** SCRUM-12 was never removed; it is in and covered by tests. SCRUM-32 now covers add, edit (title, day, time, notes), remove and rearrange with move up/down buttons within a day, which meets the story's "add, remove, or rearrange" criteria. Drag-and-drop reordering (SCRUM-36, ConOps 5.2) is still Sprint 2 and is not built. Trip rename and date changes are not built. | PM direction. |
 | 2026-10-29 | **PM approved SCRUM-15 (view travel restrictions) back into Sprint 1.** Restored as a read-only advisory banner (levels 1 to 4) on each destination page, from the seeded sample dataset, always labelled "Illustrative sample data, not official guidance" (gap G-02). The admin override (SCRUM-41) and the restriction search (SCRUM-39) remain Sprint 2 and are not built. | PM direction. |
+| 2026-11-07 | **PM approved SCRUM-35 (view past trips), SCRUM-26 (manage bookings) and SCRUM-33 (alerts).** Decisions: (1) *Past trips:* a trip is past when its end date is before today; the trips page splits into Upcoming and Past, and past trips cannot receive new flights or hotels (G-13). (2) *Bookings:* a booking is each flight or hotel item on a trip. Status is `planned` until the trip is paid (teammate's trip-level payment, PR #1), then `confirmed`. The bookings page lists them across all trips and sorts by date, price, trip, type or status. Modify = change hotel dates (repriced server-side) or remove a planned booking; flights are not re-dated; paid trips are locked. Cancel-with-refund (SCRUM-37) and refund policy (G-12) are still not built. (3) *Alerts:* severe weather in the 5-day forecast, a live State Department advisory at level 3 or 4, and delayed or cancelled flights (`flights.status`, seeded sample data). Delivered as in-app notifications plus a simulated email (`email_outbox` rows; nothing is sent). Checked on demand (once at sign-in, plus a "Check my trips for alerts" button), no background job (G-08); deduped per user. Sample advisories never raise alerts. Needs `npm run db:init` to pick up the new tables and demo trips. | PM direction. |
 | 2026-10-29 | **SCRUM-15 now uses live U.S. Department of State data** instead of the made-up seed advisories (PM direction, resolves G-02). Source: `https://cadataapi.state.gov/api/TravelAdvisories` (no key; 218 countries; levels 1-4). Matched to destinations by country name because the feed's country codes are not ISO (for example `GB` is Gabon). Seeded advisories remain only as a labelled fallback. This satisfies "official government data" for US advisories only; the UI says the advice is for U.S. citizens and that Wayfarer is not an official source. | PM direction. |

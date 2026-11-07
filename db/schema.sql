@@ -136,3 +136,27 @@ create table payments (
 );
 
 create unique index payments_trip_unique_idx on payments (trip_id);
+
+-- In-app alerts (SCRUM-33). `email_outbox` records the SIMULATED email for each alert; nothing is sent.
+create table notifications (
+  id         integer generated always as identity primary key,
+  user_id    integer not null references users (id) on delete cascade,
+  type       text not null check (type in ('weather', 'advisory', 'delay')),
+  title      text not null,
+  body       text not null,
+  dedupe_key text not null,
+  read_at    timestamptz,
+  created_at timestamptz not null default now(),
+  unique (user_id, dedupe_key)
+);
+create index notifications_user_idx on notifications (user_id, created_at desc);
+
+create table email_outbox (
+  id              integer generated always as identity primary key,
+  user_id         integer not null references users (id) on delete cascade,
+  notification_id integer references notifications (id) on delete set null,
+  to_email        text not null,
+  subject         text not null,
+  body            text not null,
+  created_at      timestamptz not null default now()
+);

@@ -428,6 +428,73 @@ describe('Itinerary (real Postgres)', () => {
     });
   });
 
+  describe('SCRUM-35: view past trips', () => {
+    const mkTrip = (who: TestUser, name: string, startOffset: number, endOffset: number) =>
+      call('POST', '/trips', who, {
+        destinationSlug: 'paris',
+        name,
+        startDate: daysFromNow(startOffset),
+        endDate: daysFromNow(endOffset),
+      });
+    const list = async (who: TestUser, query = '') =>
+      (await call('GET', `/trips${query}`, who)).json().trips as Array<{
+        name: string;
+        isPast: boolean;
+      }>;
+
+    it('flags previous trips, lists upcoming first and past most-recent first', async () => {
+      const who = await registerUser(app);
+      for (const [name, s, e] of [
+        ['Long ago', -90, -85],
+        ['Last month', -40, -35],
+        ['Ends today', -3, 0],
+        ['Next year', 200, 205],
+        ['Soon', 10, 14],
+      ] as const) {
+        expect((await mkTrip(who, name, s, e)).statusCode).toBe(201);
+      }
+      const all = await list(who);
+      expect(all.map((t) => t.name)).toEqual([
+        'Ends today',
+        'Soon',
+        'Next year',
+        'Last month',
+        'Long ago',
+      ]);
+      expect(all.map((t) => t.isPast)).toEqual([false, false, false, true, true]);
+    });
+
+    it('filters by scope: past, upcoming and all', async () => {
+      const who = await registerUser(app);
+      await mkTrip(who, 'Old', -30, -25);
+      await mkTrip(who, 'New', 5, 9);
+      expect((await list(who, '?scope=past')).map((t) => t.name)).toEqual(['Old']);
+      expect((await list(who, '?scope=upcoming')).map((t) => t.name)).toEqual(['New']);
+      expect((await list(who, '?scope=all')).map((t) => t.name)).toEqual(['New', 'Old']);
+    });
+
+    it('returns an empty list when there are no previous trips, and rejects a bad scope', async () => {
+      const who = await registerUser(app);
+      await mkTrip(who, 'Only upcoming', 5, 9);
+      expect(await list(who, '?scope=past')).toEqual([]);
+      expect((await call('GET', '/trips?scope=ancient', who)).statusCode).toBe(400);
+    });
+
+    it("never shows another user's previous trips", async () => {
+      const a = await registerUser(app);
+      const b = await registerUser(app);
+      await mkTrip(a, 'A past', -20, -15);
+      expect(await list(b, '?scope=past')).toEqual([]);
+      expect((await list(a, '?scope=past')).map((t) => t.name)).toEqual(['A past']);
+    });
+
+    it('still lets the owner open a past trip', async () => {
+      const who = await registerUser(app);
+      const id = (await mkTrip(who, 'Memories', -30, -25)).json().trip.id;
+      expect((await call('GET', `/trips/${id}`, who)).statusCode).toBe(200);
+    });
+  });
+
   describe('Authorisation', () => {
     it("hides one user's trips and items from another (404, not 403)", async () => {
       const id = await newTrip();

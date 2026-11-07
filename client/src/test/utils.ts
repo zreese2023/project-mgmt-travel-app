@@ -7,7 +7,17 @@ const Stub = { template: '<div />' };
 
 /** A router with every route name the app links to, but stub components. */
 export function createTestRouter(): Router {
-  const names = ['home', 'destinations', 'flights', 'hotels', 'trips', 'login', 'register'];
+  const names = [
+    'home',
+    'destinations',
+    'flights',
+    'hotels',
+    'trips',
+    'bookings',
+    'notifications',
+    'login',
+    'register',
+  ];
   return createRouter({
     history: createMemoryHistory(),
     routes: [

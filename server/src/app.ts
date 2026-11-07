@@ -5,7 +5,9 @@ import { createAdvisoryService } from './lib/advisory.js';
 import { createWeatherService, type FetchLike } from './lib/weather.js';
 import { registerAuth } from './plugins/auth.js';
 import { registerErrorHandling } from './plugins/errors.js';
+import { alertRoutes } from './routes/alerts.js';
 import { authRoutes } from './routes/auth.js';
+import { bookingRoutes } from './routes/bookings.js';
 import { destinationRoutes } from './routes/destinations.js';
 import { travelRoutes } from './routes/travel.js';
 import { tripRoutes } from './routes/trips.js';
@@ -51,6 +53,8 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       await api.register(authRoutes);
       await api.register(destinationRoutes, { weather, advisories });
       await api.register(travelRoutes);
+      await api.register(bookingRoutes);
+      await api.register(alertRoutes, { weather, advisories });
       await api.register(tripRoutes);
     },
     { prefix: '/api' },

@@ -7,6 +7,8 @@ vi.mock('../api/endpoints', () => ({
     auth: { register: vi.fn(), logout: vi.fn(), me: vi.fn() },
     destinations: { search: vi.fn() },
     trips: { list: vi.fn() },
+    notifications: { list: vi.fn(), readAll: vi.fn() },
+    alerts: { scan: vi.fn() },
   },
 }));
 
@@ -121,6 +123,8 @@ describe('SCRUM-34: header', () => {
 
   it('when signed in shows the name and trips link, loads trips and signs out', async () => {
     vi.mocked(endpoints.trips.list).mockResolvedValue({ trips: [] });
+    vi.mocked(endpoints.alerts.scan).mockResolvedValue({ created: 0 });
+    vi.mocked(endpoints.notifications.list).mockResolvedValue({ notifications: [], unread: 0 });
     vi.mocked(endpoints.auth.logout).mockResolvedValue(undefined);
     const { wrapper, router, pinia } = await mountWithApp(AppHeader);
     useAuthStore(pinia).user = user;
@@ -138,12 +142,71 @@ describe('SCRUM-34: header', () => {
     expect(router.currentRoute.value.name).toBe('home');
   });
 
-  it('has no notifications or profile links in this build', async () => {
-    const { wrapper, pinia } = await mountWithApp(AppHeader);
+  it('has no profile link in this build', async () => {
     vi.mocked(endpoints.trips.list).mockResolvedValue({ trips: [] });
+    vi.mocked(endpoints.alerts.scan).mockResolvedValue({ created: 0 });
+    vi.mocked(endpoints.notifications.list).mockResolvedValue({ notifications: [], unread: 0 });
+    const { wrapper, pinia } = await mountWithApp(AppHeader);
     useAuthStore(pinia).user = user;
     await flushPromises();
-    expect(wrapper.text()).not.toMatch(/notifications|profile/i);
+    expect(wrapper.text()).not.toMatch(/profile/i);
+  });
+
+  it('shows Bookings and Alerts links only when signed in', async () => {
+    vi.mocked(endpoints.trips.list).mockResolvedValue({ trips: [] });
+    vi.mocked(endpoints.alerts.scan).mockResolvedValue({ created: 0 });
+    vi.mocked(endpoints.notifications.list).mockResolvedValue({ notifications: [], unread: 0 });
+    const { wrapper, pinia } = await mountWithApp(AppHeader);
+    expect(wrapper.text()).not.toContain('Bookings');
+    expect(wrapper.find('[data-testid="nav-alerts"]').exists()).toBe(false);
+
+    useAuthStore(pinia).user = user;
+    await flushPromises();
+    expect(wrapper.text()).toContain('Bookings');
+    expect(wrapper.get('[data-testid="nav-alerts"]').text()).toContain('Alerts');
+  });
+
+  it('checks for alerts once on sign-in and shows the unread count on the Alerts link', async () => {
+    vi.mocked(endpoints.trips.list).mockResolvedValue({ trips: [] });
+    vi.mocked(endpoints.alerts.scan).mockResolvedValue({ created: 2 });
+    vi.mocked(endpoints.notifications.list).mockResolvedValue({
+      notifications: [],
+      unread: 2,
+    });
+    const { wrapper, pinia } = await mountWithApp(AppHeader);
+    useAuthStore(pinia).user = user;
+    await flushPromises();
+    expect(endpoints.alerts.scan).toHaveBeenCalledTimes(1);
+    expect(wrapper.get('[data-testid="unread-count"]').text()).toBe('2');
+  });
+
+  it('hides the unread count when there is nothing unread, and clears it on sign-out', async () => {
+    vi.mocked(endpoints.trips.list).mockResolvedValue({ trips: [] });
+    vi.mocked(endpoints.alerts.scan).mockResolvedValue({ created: 1 });
+    vi.mocked(endpoints.notifications.list).mockResolvedValue({ notifications: [], unread: 1 });
+    vi.mocked(endpoints.auth.logout).mockResolvedValue(undefined);
+    const { wrapper, pinia } = await mountWithApp(AppHeader);
+    useAuthStore(pinia).user = user;
+    await flushPromises();
+    expect(wrapper.find('[data-testid="unread-count"]').exists()).toBe(true);
+
+    await wrapper.get('[data-testid="sign-out"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.find('[data-testid="unread-count"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="nav-alerts"]').exists()).toBe(false);
+  });
+
+  it('still works if the automatic alert check fails', async () => {
+    vi.mocked(endpoints.trips.list).mockResolvedValue({ trips: [] });
+    vi.mocked(endpoints.alerts.scan).mockRejectedValue(new ApiError(500, 'internal_error', 'x'));
+    vi.mocked(endpoints.notifications.list).mockRejectedValue(
+      new ApiError(500, 'internal_error', 'x'),
+    );
+    const { wrapper, pinia } = await mountWithApp(AppHeader);
+    useAuthStore(pinia).user = user;
+    await flushPromises();
+    expect(wrapper.get('[data-testid="user-name"]').text()).toBe('Ada');
+    expect(wrapper.find('[data-testid="unread-count"]').exists()).toBe(false);
   });
 });
 

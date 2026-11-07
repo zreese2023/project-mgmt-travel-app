@@ -3,7 +3,7 @@
 A travel and tourism web app prototype for a project management class: search destinations, compare
 flights and hotels, check the weather and build a day-by-day itinerary.
 
-**All flights, hotels and prices are fictional sample data.** Nothing can be booked or paid for.
+**All flights, hotels and prices are fictional sample data.** Nothing real can be booked or paid for; payments are simulated.
 Weather and travel advisories are live data from the free Open-Meteo and U.S. State Department
 services, so those need an internet connection (the app still works without it).
 
@@ -20,6 +20,17 @@ services, so those need an internet connection (the app still works without it).
 - **Weather popup:** current conditions and a 5-day forecast from the free
   [Open-Meteo](https://open-meteo.com/) API, with a friendly message if it cannot be reached.
 - **Accounts:** register, sign in and sign out.
+
+Added after Sprint 1:
+
+- **Past trips:** the trips page separates upcoming trips from past ones (end date before today).
+- **Bookings:** every flight and hotel on your trips in one sortable table. A booking is *planned*
+  until its trip is paid, then *confirmed*. You can change hotel dates (the price updates) or remove a
+  planned booking; paid trips are locked.
+- **Alerts:** severe weather in the forecast, a U.S. State Department advisory at level 3 or 4, and
+  delayed or cancelled flights (flight status is sample data) become in-app alerts. Each also creates a
+  simulated email row in the database; nothing is sent. Alerts are checked when you sign in and when you
+  press **Check my trips for alerts**, not by a background job.
 
 ## Prerequisites
 
@@ -38,7 +49,10 @@ npm run dev       # starts the API (port 3001) and the web app (port 5173)
 
 Then open **http://localhost:5173** (use `localhost`, not `127.0.0.1`).
 
-**Demo login:** `demo@wayfarer.test` / `wayfarer123`, or create your own account.
+**Demo login:** `demo@wayfarer.test` / `wayfarer123`, or create your own account. The demo account
+comes with a paid past trip (Rome) and an upcoming Dubai trip built around a delayed flight, so
+**Past trips**, **Bookings** and **Alerts** have something to show. If you pulled new code, run
+`npm run db:init` once to add the new tables and demo trips.
 
 On later days you only need `npm run db:up` (if the database container is stopped) followed by
 `npm run dev`. Stop the app with Ctrl+C, and stop the database with `npm run db:down`.

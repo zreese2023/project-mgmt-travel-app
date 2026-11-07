@@ -209,3 +209,12 @@ from (
     ('17:40'::time, 'Meridian Airways', 'MA', 0.92)
   ) as s(dep, airline, code, price_factor)
 ) q;
+
+-- A few flights are delayed or cancelled so flight-status alerts can be demonstrated. Only the
+-- evening flight (MA) can be cancelled, so every route and day keeps at least one flight that
+-- can still be selected.
+update flights set status = case
+  when abs(hashtext(flight_no || depart_at::text)) % 100 < 5 then 'delayed'
+  when flight_no like 'MA%' and abs(hashtext(flight_no || depart_at::text)) % 100 < 7 then 'cancelled'
+  else status
+end;

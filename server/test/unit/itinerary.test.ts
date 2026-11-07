@@ -5,7 +5,9 @@ import {
   insertAt,
   insertionIndex,
   isHourMinute,
+  isPastTrip,
   moveInOrder,
+  orderTrips,
   summarizeTrip,
   toHourMinute,
   type ItineraryItem,
@@ -156,5 +158,37 @@ describe('SCRUM-32: rearranging items (pure)', () => {
     const ids = [1, 2, 3];
     moveInOrder(ids, 2, 'up');
     expect(ids).toEqual([1, 2, 3]);
+  });
+});
+
+describe('SCRUM-35: past trips', () => {
+  const today = '2026-11-10';
+
+  it('is past only once the last day is before today', () => {
+    expect(isPastTrip('2026-11-09', today)).toBe(true);
+    expect(isPastTrip('2026-11-10', today)).toBe(false); // ends today: still current
+    expect(isPastTrip('2026-11-11', today)).toBe(false);
+    expect(isPastTrip('2025-01-01', today)).toBe(true);
+  });
+
+  it('orders upcoming trips soonest first, then past trips most recently ended first', () => {
+    const trips = [
+      { id: 1, startDate: '2026-01-01', endDate: '2026-01-05' }, // past, older
+      { id: 2, startDate: '2026-12-20', endDate: '2026-12-25' }, // upcoming, later
+      { id: 3, startDate: '2026-11-01', endDate: '2026-11-10' }, // ends today: upcoming
+      { id: 4, startDate: '2026-10-01', endDate: '2026-10-07' }, // past, recent
+      { id: 5, startDate: '2026-11-15', endDate: '2026-11-20' }, // upcoming, soon
+    ];
+    expect(orderTrips(trips, today).map((t) => t.id)).toEqual([3, 5, 2, 4, 1]);
+  });
+
+  it('breaks ties by id and does not mutate its input', () => {
+    const trips = [
+      { id: 2, startDate: '2026-12-01', endDate: '2026-12-02' },
+      { id: 1, startDate: '2026-12-01', endDate: '2026-12-02' },
+    ];
+    expect(orderTrips(trips, today).map((t) => t.id)).toEqual([1, 2]);
+    expect(trips.map((t) => t.id)).toEqual([2, 1]);
+    expect(orderTrips([], today)).toEqual([]);
   });
 });

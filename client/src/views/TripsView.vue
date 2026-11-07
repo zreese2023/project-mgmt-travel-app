@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { endpoints } from '../api/endpoints';
 import type { DestinationSummary } from '../api/types';
@@ -75,6 +75,23 @@ async function remove(id: number, tripName: string): Promise<void> {
   }
 }
 
+const upcoming = computed(() => trips.trips.filter((t) => !t.isPast));
+const past = computed(() => trips.trips.filter((t) => t.isPast));
+const groups = computed(() => [
+  {
+    key: 'upcoming',
+    title: `Upcoming trips (${upcoming.value.length})`,
+    trips: upcoming.value,
+    empty: 'No upcoming trips.',
+  },
+  {
+    key: 'past',
+    title: `Past trips (${past.value.length})`,
+    trips: past.value,
+    empty: 'No past trips yet.',
+  },
+]);
+
 onMounted(load);
 </script>
 
@@ -113,37 +130,45 @@ onMounted(load);
     </button>
   </form>
 
-  <h2 style="margin-top: 1.5rem">Your itineraries</h2>
-  <p v-if="loading" class="status">Loading your trips…</p>
+  <p v-if="loading" class="status" style="margin-top: 1.5rem">Loading your trips…</p>
   <p v-else-if="trips.trips.length === 0" class="status" data-testid="no-trips">
     You have no trips yet. Create one above to start building an itinerary.
   </p>
-  <div v-else class="grid">
-    <article v-for="trip in trips.trips" :key="trip.id" class="card" data-testid="trip-card">
-      <h3>
-        <RouterLink :to="{ name: 'trip', params: { id: trip.id } }">{{ trip.name }}</RouterLink>
-      </h3>
-      <p class="muted small">
-        {{ trip.destination.name }} · {{ formatDate(trip.startDate) }} to
-        {{ formatDate(trip.endDate) }}
+  <template v-else>
+    <section v-for="group in groups" :key="group.key" :data-testid="`${group.key}-section`">
+      <h2 style="margin-top: 1.5rem">{{ group.title }}</h2>
+      <p v-if="group.trips.length === 0" class="status" :data-testid="`no-${group.key}-trips`">
+        {{ group.empty }}
       </p>
-      <p class="small">
-        {{ plural(trip.itemCount, 'item') }} planned
-        <span v-if="trip.paid" class="kind kind--booked" data-testid="trip-paid">Paid</span>
-      </p>
-      <div class="row">
-        <RouterLink class="button button--small" :to="{ name: 'trip', params: { id: trip.id } }"
-          >Open</RouterLink
-        >
-        <button
-          v-if="!trip.paid"
-          type="button"
-          class="button--small button--danger"
-          @click="remove(trip.id, trip.name)"
-        >
-          Delete
-        </button>
+      <div v-else class="grid">
+        <article v-for="trip in group.trips" :key="trip.id" class="card" data-testid="trip-card">
+          <h3>
+            <RouterLink :to="{ name: 'trip', params: { id: trip.id } }">{{ trip.name }}</RouterLink>
+          </h3>
+          <p class="muted small">
+            {{ trip.destination.name }} · {{ formatDate(trip.startDate) }} to
+            {{ formatDate(trip.endDate) }}
+          </p>
+          <p class="small">
+            {{ plural(trip.itemCount, 'item') }} planned
+            <span v-if="trip.isPast" class="kind" data-testid="trip-past">Past</span>
+            <span v-if="trip.paid" class="kind kind--booked" data-testid="trip-paid">Paid</span>
+          </p>
+          <div class="row">
+            <RouterLink class="button button--small" :to="{ name: 'trip', params: { id: trip.id } }"
+              >Open</RouterLink
+            >
+            <button
+              v-if="!trip.paid"
+              type="button"
+              class="button--small button--danger"
+              @click="remove(trip.id, trip.name)"
+            >
+              Delete
+            </button>
+          </div>
+        </article>
       </div>
-    </article>
-  </div>
+    </section>
+  </template>
 </template>

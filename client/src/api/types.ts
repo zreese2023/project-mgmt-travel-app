@@ -207,6 +207,7 @@ export interface Trip {
 export interface TripListEntry extends Trip {
   itemCount: number;
   paid: boolean;
+  isPast: boolean;
 }
 
 export interface DayPlan {
@@ -254,4 +255,40 @@ export interface NewTrip {
   name: string;
   startDate: string;
   endDate: string;
+}
+
+export type TripScope = 'all' | 'upcoming' | 'past';
+
+/** A flight or hotel on one of the user's trips (SCRUM-26). */
+export interface Booking {
+  /** The itinerary item id. */
+  id: number;
+  tripId: number;
+  tripName: string;
+  destination: string;
+  kind: 'flight' | 'hotel';
+  title: string;
+  startDate: string;
+  endDate: string;
+  nights: number | null;
+  amount: number;
+  status: 'planned' | 'confirmed';
+  paidAt: string | null;
+  isPast: boolean;
+  canRemove: boolean;
+  canChangeDates: boolean;
+}
+
+export type BookingSort = 'date' | 'price' | 'trip' | 'type' | 'status';
+export type SortOrder = 'asc' | 'desc';
+export type BookingScope = 'all' | 'upcoming' | 'past';
+
+/** An alert for the user (SCRUM-33). */
+export interface AppNotification {
+  id: number;
+  type: 'weather' | 'advisory' | 'delay';
+  title: string;
+  body: string;
+  read: boolean;
+  createdAt: string;
 }

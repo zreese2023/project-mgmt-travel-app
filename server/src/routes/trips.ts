@@ -19,7 +19,21 @@ export async function tripRoutes(app: FastifyInstance): Promise<void> {
   app.addHook('onRequest', app.authenticate);
 
   // SCRUM-31
-  app.get('/trips', async (request) => ({ trips: await listTrips(app.pg.pool, request.user.id) }));
+  app.get<{ Querystring: { scope?: 'all' | 'upcoming' | 'past' } }>(
+    '/trips',
+    {
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: { scope: { type: 'string', enum: ['all', 'upcoming', 'past'] } },
+        },
+      },
+    },
+    // SCRUM-35: scope=past lists previous trips; the default lists all, upcoming first.
+    async (request) => ({
+      trips: await listTrips(app.pg.pool, request.user.id, { scope: request.query.scope }),
+    }),
+  );
 
   app.post<{ Body: { destinationSlug: string; name: string; startDate: string; endDate: string } }>(
     '/trips',

@@ -78,6 +78,27 @@ describe('SCRUM-34: guards wired into the router', () => {
     expect(router.currentRoute.value.name).toBe('home');
   });
 
+  it.each(['/bookings', '/notifications'])(
+    'sends a signed-out visit to %s to login, and lets a signed-in user in',
+    async (path) => {
+      vi.mocked(endpoints.auth.me).mockRejectedValueOnce(
+        new ApiError(401, 'unauthenticated', 'no'),
+      );
+      const signedOut = buildRouter();
+      await signedOut.push(path);
+      expect(signedOut.currentRoute.value.name).toBe('login');
+      expect(signedOut.currentRoute.value.query.redirect).toBe(path);
+
+      setActivePinia(createPinia());
+      vi.mocked(endpoints.auth.me).mockResolvedValueOnce({
+        user: { id: 1, email: 'a@b.co', name: 'A', role: 'user' },
+      });
+      const signedIn = buildRouter();
+      await signedIn.push(path);
+      expect(signedIn.currentRoute.value.path).toBe(path);
+    },
+  );
+
   it('gives every route a title and a unique name', () => {
     const names = routes.map((r) => r.name);
     expect(new Set(names).size).toBe(names.length);

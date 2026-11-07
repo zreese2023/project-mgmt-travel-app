@@ -34,6 +34,7 @@ const tripEntry: TripListEntry = {
   createdAt: '2026-10-21T00:00:00.000Z',
   itemCount: 2,
   paid: false,
+  isPast: false,
 };
 
 const item = (id: number, overrides: object = {}) => ({
@@ -178,6 +179,72 @@ describe('SCRUM-31: trips list', () => {
     await wrapper.get('[data-testid="trip-card"] .button--danger').trigger('click');
     await flushPromises();
     expect(endpoints.trips.remove).toHaveBeenCalledWith(3);
+  });
+});
+
+describe('SCRUM-35: past trips on the trips page', () => {
+  const past = (id: number, name: string, extra: Partial<TripListEntry> = {}): TripListEntry => ({
+    ...tripEntry,
+    id,
+    name,
+    startDate: '2026-09-28',
+    endDate: '2026-10-03',
+    isPast: true,
+    ...extra,
+  });
+
+  it('splits trips into an upcoming section and a past section, with counts', async () => {
+    vi.mocked(endpoints.trips.list).mockResolvedValue({
+      trips: [tripEntry, past(8, 'Rome weekend'), past(9, 'Oslo')],
+    });
+    const { wrapper } = await mountWithApp(TripsView, { location: '/trips' });
+    const upcoming = wrapper.get('[data-testid="upcoming-section"]');
+    const previous = wrapper.get('[data-testid="past-section"]');
+    expect(upcoming.get('h2').text()).toBe('Upcoming trips (1)');
+    expect(previous.get('h2').text()).toBe('Past trips (2)');
+    expect(upcoming.findAll('[data-testid="trip-card"]')).toHaveLength(1);
+    expect(previous.findAll('[data-testid="trip-card"]').map((c) => c.find('a').text())).toEqual([
+      'Rome weekend',
+      'Oslo',
+    ]);
+  });
+
+  it('marks previous trips as past, and shows paid ones as paid', async () => {
+    vi.mocked(endpoints.trips.list).mockResolvedValue({
+      trips: [past(8, 'Rome weekend', { paid: true }), past(9, 'Oslo')],
+    });
+    const { wrapper } = await mountWithApp(TripsView, { location: '/trips' });
+    const cards = wrapper.findAll('[data-testid="trip-card"]');
+    expect(cards.every((c) => c.find('[data-testid="trip-past"]').exists())).toBe(true);
+    expect(cards[0]!.find('[data-testid="trip-paid"]').exists()).toBe(true);
+    expect(cards[1]!.find('[data-testid="trip-paid"]').exists()).toBe(false);
+  });
+
+  it('does not mark upcoming trips as past', async () => {
+    const { wrapper } = await mountWithApp(TripsView, { location: '/trips' });
+    expect(wrapper.find('[data-testid="trip-past"]').exists()).toBe(false);
+  });
+
+  it('says so when there are no past trips, and when there are no upcoming ones', async () => {
+    const onlyUpcoming = await mountWithApp(TripsView, { location: '/trips' });
+    expect(onlyUpcoming.wrapper.get('[data-testid="no-past-trips"]').text()).toBe(
+      'No past trips yet.',
+    );
+
+    vi.mocked(endpoints.trips.list).mockResolvedValue({ trips: [past(8, 'Rome weekend')] });
+    const onlyPast = await mountWithApp(TripsView, { location: '/trips' });
+    expect(onlyPast.wrapper.get('[data-testid="no-upcoming-trips"]').text()).toBe(
+      'No upcoming trips.',
+    );
+    expect(onlyPast.wrapper.find('[data-testid="no-trips"]').exists()).toBe(false);
+  });
+
+  it('lets you open a past trip to look back at it', async () => {
+    vi.mocked(endpoints.trips.list).mockResolvedValue({ trips: [past(8, 'Rome weekend')] });
+    const { wrapper } = await mountWithApp(TripsView, { location: '/trips' });
+    expect(wrapper.get('[data-testid="past-section"] a.button').attributes('href')).toBe(
+      '/trips/8',
+    );
   });
 });
 

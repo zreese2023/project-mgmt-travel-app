@@ -1,5 +1,11 @@
 import { api, type ApiClient } from './client';
 import type {
+  AppNotification,
+  Booking,
+  BookingScope,
+  BookingSort,
+  SortOrder,
+  TripScope,
   AdvisoryResponse,
   Airport,
   DestinationDetail,
@@ -50,6 +56,21 @@ export function createEndpoints(client: ApiClient) {
       advisory: (slug: string) =>
         client.get<AdvisoryResponse>(`/destinations/${encodeURIComponent(slug)}/advisory`),
     },
+    bookings: {
+      list: (query: { sort?: BookingSort; order?: SortOrder; scope?: BookingScope } = {}) =>
+        client.get<{ bookings: Booking[] }>('/bookings', { ...query }),
+      changeStay: (id: number, stay: { checkIn: string; checkOut: string }) =>
+        client.patch<{ booking: Booking }>(`/bookings/${id}`, stay),
+      remove: (id: number) => client.delete<void>(`/bookings/${id}`),
+    },
+    notifications: {
+      list: () =>
+        client.get<{ notifications: AppNotification[]; unread: number }>('/notifications'),
+      readAll: () => client.post<{ updated: number }>('/notifications/read-all'),
+    },
+    alerts: {
+      scan: () => client.post<{ created: number }>('/alerts/scan'),
+    },
     travel: {
       airports: () =>
         client.get<{ airports: Airport[]; searchWindow: { from: string; to: string } }>(
@@ -60,7 +81,7 @@ export function createEndpoints(client: ApiClient) {
         client.get<{ hotels: Hotel[]; note: string }>('/hotels', { ...search }),
     },
     trips: {
-      list: () => client.get<{ trips: TripListEntry[] }>('/trips'),
+      list: (scope?: TripScope) => client.get<{ trips: TripListEntry[] }>('/trips', { scope }),
       create: (input: NewTrip) => client.post<{ trip: Trip }>('/trips', input),
       get: (id: number) => client.get<TripDetail>(`/trips/${id}`),
       remove: (id: number) => client.delete<void>(`/trips/${id}`),

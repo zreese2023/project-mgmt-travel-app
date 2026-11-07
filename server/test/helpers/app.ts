@@ -26,6 +26,26 @@ export const failingWeatherFetch: FetchLike = async () => {
   throw new Error('network down');
 };
 
+/**
+ * Open-Meteo stub whose 5-day forecast starts today (UTC), so alert tests can place trips on
+ * known days. Default codes: thunderstorm, clear, heavy rain, clear, snow.
+ */
+export function severeWeatherFetch(codes: number[] = [95, 0, 65, 0, 75]): FetchLike {
+  return async () => ({
+    ok: true,
+    status: 200,
+    json: async () => ({
+      current: { temperature_2m: 60, weather_code: 0, wind_speed_10m: 5 },
+      daily: {
+        time: codes.map((_, i) => addDays(todayIso(), i)),
+        weather_code: codes,
+        temperature_2m_max: codes.map(() => 70),
+        temperature_2m_min: codes.map(() => 50),
+      },
+    }),
+  });
+}
+
 /** Entries shaped like the State Department feed; the United States is deliberately absent. */
 const FEED_COUNTRIES: Array<[string, number, string]> = [
   ['Japan', 1, 'Exercise Normal Precautions'],

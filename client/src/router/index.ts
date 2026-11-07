@@ -46,6 +46,18 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, title: 'Itinerary' },
   },
   {
+    path: '/bookings',
+    name: 'bookings',
+    component: () => import('../views/BookingsView.vue'),
+    meta: { requiresAuth: true, title: 'My bookings' },
+  },
+  {
+    path: '/notifications',
+    name: 'notifications',
+    component: () => import('../views/NotificationsView.vue'),
+    meta: { requiresAuth: true, title: 'Alerts' },
+  },
+  {
     path: '/login',
     name: 'login',
     component: () => import('../views/LoginView.vue'),

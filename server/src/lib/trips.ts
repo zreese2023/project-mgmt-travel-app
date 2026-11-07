@@ -1,4 +1,4 @@
-import { isIsoDate } from './dates.js';
+import { isIsoDate, todayIso } from './dates.js';
 import type { Queryable } from './db.js';
 import { withTransaction } from './db.js';
 import { AppError, badRequest, notFound } from './errors.js';
@@ -7,14 +7,17 @@ import {
   hotelStayNote,
   insertAt,
   insertionIndex,
+  isPastTrip,
   isHourMinute,
   moveInOrder,
+  orderTrips,
   summarizeTrip,
   toHourMinute,
   type DayPlan,
   type ItemKind,
   type ItineraryItem,
   type MoveDirection,
+  type TripScope,
   type TripSummary,
 } from './itinerary.js';
 import {
@@ -39,6 +42,7 @@ export interface Trip {
 export interface TripListEntry extends Trip {
   itemCount: number;
   paid: boolean;
+  isPast: boolean;
 }
 
 export interface TripDetail {
@@ -234,17 +238,39 @@ export async function createTrip(
   return toTrip(await loadOwnedTrip(pool, userId, (rows[0] as { id: number }).id));
 }
 
-export async function listTrips(db: Queryable, userId: number): Promise<TripListEntry[]> {
+export interface ListTripsOptions {
+  scope?: TripScope;
+  /** 'YYYY-MM-DD' used to decide what is past; defaults to today (UTC). Tests pass a fixed date. */
+  today?: string;
+}
+
+/** The user's trips, upcoming first then past; `scope` narrows to one of the two groups. */
+export async function listTrips(
+  db: Queryable,
+  userId: number,
+  options: ListTripsOptions = {},
+): Promise<TripListEntry[]> {
+  const today = options.today ?? todayIso();
+  const scope = options.scope ?? 'all';
   const { rows } = await db.query<TripRow & { item_count: number; paid: boolean }>(
     `select t.id, t.user_id, t.name, t.start_date, t.end_date, t.created_at, t.destination_id,
             d.slug as destination_slug, d.name as destination_name, d.image_url, d.airport_code,
             (select count(*) from itinerary_items i where i.trip_id = t.id) as item_count,
             exists (select 1 from payments p where p.trip_id = t.id) as paid
      from trips t join destinations d on d.id = t.destination_id
-     where t.user_id = $1 order by t.start_date, t.id`,
+     where t.user_id = $1`,
     [userId],
   );
-  return rows.map((row) => ({ ...toTrip(row), itemCount: row.item_count, paid: row.paid }));
+  const entries = rows.map((row) => ({
+    ...toTrip(row),
+    itemCount: row.item_count,
+    paid: row.paid,
+    isPast: isPastTrip(row.end_date, today),
+  }));
+  const ordered = orderTrips(entries, today);
+  if (scope === 'past') return ordered.filter((t) => t.isPast);
+  if (scope === 'upcoming') return ordered.filter((t) => !t.isPast);
+  return ordered;
 }
 
 export async function getTripDetail(

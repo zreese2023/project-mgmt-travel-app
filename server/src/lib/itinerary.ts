@@ -55,6 +55,27 @@ export function insertAt(ids: readonly number[], id: number, index: number): num
   return [...ids.slice(0, at), id, ...ids.slice(at)];
 }
 
+export type TripScope = 'all' | 'upcoming' | 'past';
+
+/** A trip is past once its last day is before today (a trip that ends today is still current). */
+export function isPastTrip(endDate: string, today: string): boolean {
+  return endDate < today;
+}
+
+/** Upcoming trips first (soonest start first), then past trips (most recently ended first). */
+export function orderTrips<T extends { id: number; startDate: string; endDate: string }>(
+  trips: readonly T[],
+  today: string,
+): T[] {
+  const upcoming = trips
+    .filter((t) => !isPastTrip(t.endDate, today))
+    .sort((a, b) => a.startDate.localeCompare(b.startDate) || a.id - b.id);
+  const past = trips
+    .filter((t) => isPastTrip(t.endDate, today))
+    .sort((a, b) => b.endDate.localeCompare(a.endDate) || b.id - a.id);
+  return [...upcoming, ...past];
+}
+
 export type MoveDirection = 'up' | 'down';
 
 /**

@@ -186,6 +186,30 @@ describe('Endpoint functions', () => {
     await e.trips.moveItem(3, 9, 'up');
     expect(lastCall(fetch)).toMatchObject({ url: '/api/trips/3/items/9/move', method: 'POST' });
     expect(lastCall(fetch).body).toBe('{"direction":"up"}');
+    await e.trips.list('past');
+    expect(lastCall(fetch)).toMatchObject({ url: '/api/trips?scope=past', method: 'GET' });
+    await e.trips.list();
+    expect(lastCall(fetch).url).toBe('/api/trips');
+
+    await e.bookings.list({ sort: 'price', order: 'desc', scope: 'upcoming' });
+    expect(lastCall(fetch)).toMatchObject({
+      url: '/api/bookings?sort=price&order=desc&scope=upcoming',
+      method: 'GET',
+    });
+    await e.bookings.list();
+    expect(lastCall(fetch).url).toBe('/api/bookings');
+    await e.bookings.changeStay(11, { checkIn: '2026-12-02', checkOut: '2026-12-05' });
+    expect(lastCall(fetch)).toMatchObject({ url: '/api/bookings/11', method: 'PATCH' });
+    expect(lastCall(fetch).body).toBe('{"checkIn":"2026-12-02","checkOut":"2026-12-05"}');
+    await e.bookings.remove(11);
+    expect(lastCall(fetch)).toMatchObject({ url: '/api/bookings/11', method: 'DELETE' });
+
+    await e.notifications.list();
+    expect(lastCall(fetch)).toMatchObject({ url: '/api/notifications', method: 'GET' });
+    await e.notifications.readAll();
+    expect(lastCall(fetch)).toMatchObject({ url: '/api/notifications/read-all', method: 'POST' });
+    await e.alerts.scan();
+    expect(lastCall(fetch)).toMatchObject({ url: '/api/alerts/scan', method: 'POST' });
     await e.trips.removeItem(3, 9);
     expect(lastCall(fetch)).toMatchObject({ url: '/api/trips/3/items/9', method: 'DELETE' });
   });
