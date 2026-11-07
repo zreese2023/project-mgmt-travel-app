@@ -24,6 +24,7 @@ const hotel: Booking = {
   endDate: '2026-12-04',
   nights: 3,
   amount: 336,
+  detail: null,
   status: 'planned',
   paidAt: null,
   isPast: false,

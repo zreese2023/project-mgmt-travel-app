@@ -124,6 +124,26 @@ create table itinerary_items (
 );
 create index itinerary_items_trip_idx on itinerary_items (trip_id, day, position);
 
+-- Checkout details for flight and hotel items (SCRUM-15, SCRUM-16). An item without a row here was
+-- added without checkout and is priced with the defaults (one passenger, cheapest room).
+create table flight_bookings (
+  item_id    integer primary key references itinerary_items (id) on delete cascade,
+  -- [{ fullName, dateOfBirth, seat, checkedBags }], the same list on every leg of the booking
+  passengers jsonb not null check (jsonb_typeof(passengers) = 'array' and jsonb_array_length(passengers) between 1 and 9)
+);
+
+create table hotel_bookings (
+  item_id      integer primary key references itinerary_items (id) on delete cascade,
+  room_type_id integer not null references room_types (id),
+  rooms        integer not null check (rooms between 1 and 4),
+  guests       integer not null check (guests >= 1),
+  guest_name   text not null,
+  guest_email  text not null,
+  guest_phone  text not null,
+  requests     text[] not null default '{}',
+  request_note text
+);
+
 -- Payments table for tracking trip payments
 -- It's just kind of a fake payment though for the
 create table payments (

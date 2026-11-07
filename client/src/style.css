@@ -587,3 +587,177 @@ table.bookings th {
   background: none;
   text-decoration: underline;
 }
+
+/* ---- checkout (SCRUM-15, SCRUM-16) ---- */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.steps {
+  list-style: none;
+  display: flex;
+  gap: 0.5rem;
+  padding: 0;
+  margin: 0 0 1rem;
+}
+.steps__item {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.9rem;
+  min-width: 0;
+}
+.steps__number {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 999px;
+  background: var(--surface-alt);
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+.steps__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.steps__item--current {
+  border-color: var(--primary);
+  color: var(--text);
+  font-weight: 600;
+}
+.steps__item--current .steps__number {
+  background: var(--primary);
+  color: var(--primary-text);
+}
+.steps__item--done .steps__number {
+  background: var(--success-bg);
+  color: var(--success);
+}
+@media (max-width: 640px) {
+  /* Only the current step keeps its label on a phone. */
+  .steps__item:not(.steps__item--current) {
+    flex: none;
+  }
+  .steps__item:not(.steps__item--current) .steps__label {
+    display: none;
+  }
+}
+.checkout-nav {
+  justify-content: flex-end;
+  margin-top: 1rem;
+}
+.checkout-legs,
+.checkout-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1rem;
+}
+.checkout-legs li {
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.checkout-list li {
+  padding: 0.25rem 0;
+}
+.checkout-passenger {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.5rem 0.9rem 0;
+  margin: 0 0 0.9rem;
+}
+.checkout-passenger legend {
+  font-weight: 700;
+  padding: 0 0.3rem;
+}
+.checkout-review + .checkout-review {
+  margin-top: 1.25rem;
+}
+.checkout-review h3 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.6rem;
+  align-items: baseline;
+}
+.checkout-total {
+  font-size: 1.3rem;
+  font-weight: 700;
+  text-align: right;
+  border-top: 2px solid var(--border);
+  padding-top: 0.6rem;
+}
+.checkout-hotel {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.checkout-hotel img {
+  width: 100%;
+  height: 100%;
+  min-height: 90px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+.checkout-rooms {
+  border: 0;
+  padding: 0;
+  margin: 0 0 0.75rem;
+  display: grid;
+  gap: 0.5rem;
+}
+.checkout-room {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.75rem;
+  align-items: center;
+  font-weight: 400;
+  margin: 0;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.checkout-room:hover {
+  background: var(--surface-alt);
+}
+.checkout-room--selected {
+  border-color: var(--primary);
+  outline: 2px solid var(--primary);
+}
+.checkout-room__price {
+  text-align: right;
+}
+.checkout-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.5rem 1rem;
+  margin: 1rem 0 0;
+}
+@media (max-width: 640px) {
+  .checkout-hotel {
+    grid-template-columns: 1fr;
+  }
+  .checkout-hotel img {
+    max-height: 140px;
+  }
+  .checkout-room {
+    grid-template-columns: auto 1fr;
+  }
+  .checkout-room__price {
+    grid-column: 2;
+    text-align: left;
+  }
+}

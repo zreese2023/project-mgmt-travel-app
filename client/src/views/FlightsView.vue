@@ -1,18 +1,16 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { endpoints } from '../api/endpoints';
 import type { Airport, Flight } from '../api/types';
 import FlightCard from '../components/FlightCard.vue';
 import SampleDataNotice from '../components/SampleDataNotice.vue';
-import TripPicker from '../components/TripPicker.vue';
-import { useTripsStore } from '../stores/trips';
 import { addDays, defaultDates } from '../utils/dates';
 import { errorMessage, fieldErrors } from '../utils/errors';
 import { formatMoney, plural } from '../utils/format';
 
 const route = useRoute();
-const trips = useTripsStore();
+const router = useRouter();
 
 const queryString = (key: string): string =>
   typeof route.query[key] === 'string' ? (route.query[key] as string) : '';
@@ -36,7 +34,6 @@ const searched = ref(false);
 const loading = ref(false);
 const error = ref<string | null>(null);
 const errors = ref<Record<string, string>>({});
-const message = ref<{ kind: 'success' | 'error'; text: string } | null>(null);
 
 const selectedOutbound = ref<Flight | null>(null);
 const selectedReturn = ref<Flight | null>(null);
@@ -57,7 +54,6 @@ async function search(): Promise<void> {
   loading.value = true;
   error.value = null;
   errors.value = {};
-  message.value = null;
   selectedOutbound.value = null;
   selectedReturn.value = null;
   try {
@@ -83,26 +79,19 @@ async function search(): Promise<void> {
   }
 }
 
-async function addToTrip(): Promise<void> {
-  message.value = null;
-  const tripId = trips.activeTripId;
-  if (!tripId || !selectedOutbound.value) {
-    message.value = { kind: 'error', text: 'Choose a trip first.' };
-    return;
-  }
-  try {
-    const legs = [selectedOutbound.value, roundTrip.value ? selectedReturn.value : null].filter(
-      (f): f is Flight => f !== null,
-    );
-    for (const leg of legs)
-      await endpoints.trips.addItem(tripId, { kind: 'flight', flightId: leg.id });
-    message.value = {
-      kind: 'success',
-      text: `Added ${plural(legs.length, 'flight')} to your trip.`,
-    };
-  } catch (err) {
-    message.value = { kind: 'error', text: errorMessage(err) };
-  }
+/** SCRUM-15: hand the selection to the checkout (sign-in is asked for there if needed). */
+function book(): void {
+  if (!canAdd.value || !selectedOutbound.value) return;
+  void router.push({
+    name: 'checkout-flight',
+    query: {
+      outbound: String(selectedOutbound.value.id),
+      ...(roundTrip.value && selectedReturn.value
+        ? { return: String(selectedReturn.value.id) }
+        : {}),
+      passengers: String(passengers.value),
+    },
+  });
 }
 
 onMounted(async () => {
@@ -191,9 +180,6 @@ onMounted(async () => {
   </form>
 
   <div v-if="error" class="alert alert--error" role="alert">{{ error }}</div>
-  <div v-if="message" class="alert" :class="`alert--${message.kind}`" role="status">
-    {{ message.text }}
-  </div>
 
   <template v-if="searched">
     <p class="muted small">{{ note }}</p>
@@ -224,26 +210,27 @@ onMounted(async () => {
       />
     </template>
 
-    <TripPicker />
-
     <div v-if="selectedOutbound" class="summary-bar card" data-testid="flight-summary">
       <div class="row row--between">
         <div>
           <strong>{{ plural(passengers, 'passenger') }}</strong> · about
           {{ formatMoney(estimate) }} before taxes
           <div class="muted small">
-            Sample fares only: nothing is booked or charged. Add your selection to a trip to plan
-            around it.
+            {{
+              canAdd
+                ? 'Next: passenger details, seats and bags, then the full fare.'
+                : 'Choose a return flight to continue.'
+            }}
           </div>
         </div>
         <button
           type="button"
           class="primary"
-          :disabled="!canAdd || !trips.activeTripId"
-          data-testid="add-flight"
-          @click="addToTrip"
+          :disabled="!canAdd"
+          data-testid="book-flight"
+          @click="book"
         >
-          Add to trip
+          Continue to booking
         </button>
       </div>
     </div>

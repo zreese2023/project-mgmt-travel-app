@@ -12,9 +12,15 @@ import type {
   DestinationFilterOptions,
   DestinationQuery,
   DestinationSummary,
+  Flight,
+  FlightCheckout,
+  FlightQuote,
   FlightSearch,
   FlightSearchResult,
+  GuestContact,
   Hotel,
+  HotelCheckout,
+  HotelQuote,
   HotelSearch,
   ItineraryItem,
   NewItem,
@@ -77,8 +83,30 @@ export function createEndpoints(client: ApiClient) {
           '/airports',
         ),
       flights: (search: FlightSearch) => client.get<FlightSearchResult>('/flights', { ...search }),
+      flight: (id: number) => client.get<{ flight: Flight; note: string }>(`/flights/${id}`),
       hotels: (search: HotelSearch) =>
         client.get<{ hotels: Hotel[]; note: string }>('/hotels', { ...search }),
+      hotel: (id: number, stay: { checkIn: string; checkOut: string }) =>
+        client.get<{ hotel: Hotel; note: string }>(`/hotels/${id}`, { ...stay }),
+    },
+    checkout: {
+      quoteFlights: (input: FlightCheckout) =>
+        client.post<{ quote: FlightQuote }>('/checkout/flights/quote', input),
+      bookFlights: (tripId: number, input: FlightCheckout) =>
+        client.post<{ items: ItineraryItem[]; quote: FlightQuote }>('/checkout/flights', {
+          tripId,
+          ...input,
+        }),
+      quoteHotel: (input: HotelCheckout) =>
+        client.post<{ quote: HotelQuote }>('/checkout/hotels/quote', input),
+      bookHotel: (
+        tripId: number,
+        input: HotelCheckout & { guest: GuestContact; requestNote?: string },
+      ) =>
+        client.post<{ item: ItineraryItem; quote: HotelQuote }>('/checkout/hotels', {
+          tripId,
+          ...input,
+        }),
     },
     trips: {
       list: (scope?: TripScope) => client.get<{ trips: TripListEntry[] }>('/trips', { scope }),

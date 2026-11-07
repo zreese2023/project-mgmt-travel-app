@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { parseList } from '../lib/destinations.js';
-import { searchFlights, searchWindow, type FlightSort } from '../lib/flights.js';
-import { searchHotels, type HotelSort } from '../lib/hotels.js';
+import { getFlight, searchFlights, searchWindow, type FlightSort } from '../lib/flights.js';
+import { getHotel, searchHotels, type HotelSort } from '../lib/hotels.js';
 
 interface FlightQuery {
   origin: string;
@@ -81,6 +81,16 @@ export async function travelRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
+  // SCRUM-15: one flight, for the checkout's first step
+  app.get<{ Params: { id: number } }>(
+    '/flights/:id',
+    { schema: { params: { type: 'object', properties: { id: { type: 'integer' } } } } },
+    async (request) => ({
+      flight: await getFlight(app.pg.pool, request.params.id),
+      note: 'Sample flight data. Times are shown in UTC.',
+    }),
+  );
+
   // SCRUM-23
   app.get<{ Querystring: HotelQuery }>(
     '/hotels',
@@ -118,5 +128,27 @@ export async function travelRoutes(app: FastifyInstance): Promise<void> {
       });
       return { hotels, note: 'Sample hotel data and prices.' };
     },
+  );
+
+  // SCRUM-16: one hotel with its rooms priced for the stay (first step of hotel checkout)
+  app.get<{ Params: { id: number }; Querystring: { checkIn: string; checkOut: string } }>(
+    '/hotels/:id',
+    {
+      schema: {
+        params: { type: 'object', properties: { id: { type: 'integer' } } },
+        querystring: {
+          type: 'object',
+          required: ['checkIn', 'checkOut'],
+          properties: {
+            checkIn: { type: 'string', maxLength: 10 },
+            checkOut: { type: 'string', maxLength: 10 },
+          },
+        },
+      },
+    },
+    async (request) => ({
+      hotel: await getHotel(app.pg.pool, request.params.id, request.query),
+      note: 'Sample hotel data and prices.',
+    }),
   );
 }

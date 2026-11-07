@@ -51,3 +51,36 @@ describe('SCRUM-25: trip price', () => {
     expect(priceTrip([])).toEqual({ lines: [], total: 0 });
   });
 });
+
+describe('SCRUM-15/16: trip price for items booked through checkout', () => {
+  it('prices a flight for its passengers with taxes and bags', () => {
+    const cost = priceTrip([
+      row({ flight_price: 500, passengers: [{ checkedBags: 1 }, { checkedBags: 0 }] }),
+    ]);
+    expect(cost.lines[0]).toMatchObject({ amount: 1110, detail: '2 passengers · 1 checked bag' });
+  });
+
+  it('says carry-on only when nobody checks a bag', () => {
+    const cost = priceTrip([row({ flight_price: 500, passengers: [{ checkedBags: 0 }] })]);
+    expect(cost.lines[0]).toMatchObject({ amount: 537.5, detail: '1 passenger · carry-on only' });
+  });
+
+  it('prices a stay in the booked room, for every room, with paid requests', () => {
+    const cost = priceTrip([
+      row({
+        kind: 'hotel',
+        notes: hotelStayNote('2026-11-07'),
+        nightly_price: 200,
+        rooms: 2,
+        room_name: 'Suite',
+        room_requests: ['late_check_out', 'not-a-request'],
+      }),
+    ]);
+    // 2 nights x 2 rooms x 200 = 800, + 40 late check-out = 840, + 12% = 940.80
+    expect(cost.lines[0]).toMatchObject({ amount: 940.8, detail: 'Suite × 2 · 2 nights' });
+  });
+
+  it('leaves quick-added items without a detail', () => {
+    expect(priceTrip([row({ flight_price: 100 })]).lines[0]).not.toHaveProperty('detail');
+  });
+});

@@ -181,6 +181,7 @@ onMounted(load);
           </td>
           <td>
             <strong>{{ b.title }}</strong>
+            <div v-if="b.detail" class="small" data-testid="booking-detail">{{ b.detail }}</div>
             <div v-if="editingId !== b.id" class="muted small">
               {{ formatDate(b.startDate) }}
               <template v-if="b.kind === 'hotel'">

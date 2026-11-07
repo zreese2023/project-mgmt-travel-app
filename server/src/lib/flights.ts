@@ -1,6 +1,6 @@
 import { addDays, isIsoDate, todayIso } from './dates.js';
 import type { Queryable } from './db.js';
-import { badRequest } from './errors.js';
+import { badRequest, notFound } from './errors.js';
 
 export type FlightSort = 'price' | 'duration' | 'departure';
 
@@ -144,4 +144,14 @@ export async function searchFlights(
 /** Latest date flights are seeded for, used by the UI date pickers. */
 export function searchWindow(today: string = todayIso()): { from: string; to: string } {
   return { from: addDays(today, 1), to: addDays(today, 90) };
+}
+
+/** One flight by id; the first step of flight checkout (SCRUM-15). */
+export async function getFlight(db: Queryable, id: number): Promise<Flight> {
+  const { rows } = await db.query<FlightRow>(
+    `select ${FLIGHT_COLUMNS} from flights where id = $1`,
+    [id],
+  );
+  if (!rows[0]) throw notFound('Flight');
+  return toFlight(rows[0]);
 }

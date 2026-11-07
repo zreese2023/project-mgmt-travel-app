@@ -6,12 +6,10 @@ vi.mock('../api/endpoints', () => ({
   endpoints: {
     travel: { airports: vi.fn(), flights: vi.fn(), hotels: vi.fn() },
     destinations: { search: vi.fn() },
-    trips: { addItem: vi.fn() },
   },
 }));
 
 import { endpoints } from '../api/endpoints';
-import { useTripsStore } from '../stores/trips';
 import { flushPromises, mountWithApp } from '../test/utils';
 import FlightsView from './FlightsView.vue';
 import HotelsView from './HotelsView.vue';
@@ -113,81 +111,49 @@ describe('SCRUM-21: flights page', () => {
     expect(wrapper.text()).toContain('$900.00');
   });
 
-  it('needs both legs chosen for a round trip before they can be added to a trip', async () => {
+  it('needs both legs chosen for a round trip, then continues to checkout with them', async () => {
     vi.mocked(endpoints.travel.flights).mockResolvedValue({
       outbound: [flight(1)],
       return: [flight(3, { origin: 'NRT', destination: 'JFK' })],
       note: '',
     });
-    vi.mocked(endpoints.trips.addItem).mockResolvedValue({ item: {} as never });
-    const { wrapper, pinia } = await mountWithApp(FlightsView, { location: '/flights' });
-    useTripsStore(pinia).setActive(5);
-    await wrapper.get('#flight-destination').setValue('NRT');
-    await wrapper.get('form[aria-label="Flight search"]').trigger('submit');
-    await flushPromises();
+    const { wrapper, router } = await openAndSearch();
+    await wrapper.get('#flight-passengers').setValue('2');
     const cards = wrapper.findAll('[data-testid="flight-card"]');
     expect(wrapper.find('[data-testid="flight-summary"]').exists()).toBe(false);
 
     await cards[0]!.get('button').trigger('click');
-    expect(wrapper.get('[data-testid="add-flight"]').attributes('disabled')).toBeDefined();
+    expect(wrapper.get('[data-testid="book-flight"]').attributes('disabled')).toBeDefined();
+    expect(wrapper.get('[data-testid="flight-summary"]').text()).toContain('Choose a return');
     await cards[1]!.get('button').trigger('click');
-    expect(wrapper.get('[data-testid="add-flight"]').attributes('disabled')).toBeUndefined();
+    expect(wrapper.get('[data-testid="book-flight"]').attributes('disabled')).toBeUndefined();
 
-    await wrapper.get('[data-testid="add-flight"]').trigger('click');
+    await wrapper.get('[data-testid="book-flight"]').trigger('click');
     await flushPromises();
-    expect(endpoints.trips.addItem).toHaveBeenCalledTimes(2);
-    expect(endpoints.trips.addItem).toHaveBeenNthCalledWith(1, 5, { kind: 'flight', flightId: 1 });
-    expect(endpoints.trips.addItem).toHaveBeenNthCalledWith(2, 5, { kind: 'flight', flightId: 3 });
-    expect(wrapper.get('[role="status"]').text()).toContain('Added 2 flights');
+    expect(router.currentRoute.value.name).toBe('checkout-flight');
+    expect(router.currentRoute.value.query).toEqual({
+      outbound: '1',
+      return: '3',
+      passengers: '2',
+    });
   });
 
-  it('has no checkout or booking button: this build only plans, it does not book', async () => {
+  it('books a one-way flight without a return leg', async () => {
     vi.mocked(endpoints.travel.flights).mockResolvedValue({
       outbound: [flight(1)],
       return: null,
       note: '',
     });
-    const { wrapper } = await openAndSearch();
-    await wrapper.get('[data-testid="flight-card"] button').trigger('click');
-    expect(wrapper.find('[data-testid="book-flight"]').exists()).toBe(false);
-    expect(wrapper.text()).not.toMatch(/checkout|book now/i);
-  });
-
-  it('keeps "Add to trip" disabled until a trip is chosen', async () => {
-    vi.mocked(endpoints.travel.flights).mockResolvedValue({
-      outbound: [flight(1)],
-      return: null,
-      note: '',
-    });
-    const { wrapper } = await mountWithApp(FlightsView, { location: '/flights' });
-    await wrapper.get('#flight-destination').setValue('NRT');
-    await wrapper.get('input[type="checkbox"]').setValue(false);
-    await wrapper.get('form[aria-label="Flight search"]').trigger('submit');
-    await flushPromises();
-    await wrapper.get('[data-testid="flight-card"] button').trigger('click');
-    expect(wrapper.get('[data-testid="add-flight"]').attributes('disabled')).toBeDefined();
-  });
-
-  it('adds the selected flights to the active trip', async () => {
-    vi.mocked(endpoints.travel.flights).mockResolvedValue({
-      outbound: [flight(1)],
-      return: null,
-      note: '',
-    });
-    vi.mocked(endpoints.trips.addItem).mockResolvedValue({ item: {} as never });
-    const { wrapper, pinia } = await mountWithApp(FlightsView, { location: '/flights' });
-    useTripsStore(pinia).setActive(5);
+    const { wrapper, router } = await mountWithApp(FlightsView, { location: '/flights' });
     await wrapper.get('#flight-destination').setValue('NRT');
     await wrapper.get('input[type="checkbox"]').setValue(false);
     await wrapper.get('form[aria-label="Flight search"]').trigger('submit');
     await flushPromises();
     await wrapper.get('[data-testid="flight-card"] button').trigger('click');
 
-    const addButton = wrapper.get('[data-testid="add-flight"]');
-    await addButton.trigger('click');
+    await wrapper.get('[data-testid="book-flight"]').trigger('click');
     await flushPromises();
-    expect(endpoints.trips.addItem).toHaveBeenCalledWith(5, { kind: 'flight', flightId: 1 });
-    expect(wrapper.get('[role="status"]').text()).toContain('Added 1 flight');
+    expect(router.currentRoute.value.query).toEqual({ outbound: '1', passengers: '1' });
   });
 
   it('shows an empty state when no flights match', async () => {
@@ -261,33 +227,19 @@ describe('SCRUM-23/24: hotels page', () => {
     expect(wrapper.get('[data-testid="room-option"]').text()).toContain('$336.00');
   });
 
-  it('lists rooms with sample totals and offers no booking button', async () => {
+  it('lists rooms with sample totals, each with a Book button that opens the checkout', async () => {
     vi.mocked(endpoints.travel.hotels).mockResolvedValue({ hotels: [hotel], note: '' });
-    const { wrapper } = await openAndSearch();
+    const { wrapper, router } = await openAndSearch();
     const room = wrapper.get('[data-testid="room-option"]');
     expect(room.text()).toContain('Standard Room');
     expect(room.text()).toContain('$336.00');
-    expect(room.find('button').exists()).toBe(false);
-    expect(wrapper.text()).not.toMatch(/\bbook\b/i);
-  });
 
-  it('adds a hotel to the active trip, and disables that button without one', async () => {
-    vi.mocked(endpoints.travel.hotels).mockResolvedValue({ hotels: [hotel], note: '' });
-    vi.mocked(endpoints.trips.addItem).mockResolvedValue({ item: {} as never });
-    const { wrapper, pinia } = await openAndSearch();
-    const add = () => wrapper.get('[data-testid="add-hotel"]');
-    expect(add().attributes('disabled')).toBeDefined();
-
-    useTripsStore(pinia).setActive(4);
+    await room.get('[data-testid="book-room"]').trigger('click');
     await flushPromises();
-    expect(add().attributes('disabled')).toBeUndefined();
-    await add().trigger('click');
-    await flushPromises();
-    expect(endpoints.trips.addItem).toHaveBeenCalledWith(
-      4,
-      expect.objectContaining({ kind: 'hotel', hotelId: 7 }),
-    );
-    expect(wrapper.get('[role="status"]').text()).toContain('Added Tokyo Grand Hotel');
+    expect(router.currentRoute.value.name).toBe('checkout-hotel');
+    expect(router.currentRoute.value.query).toMatchObject({ hotel: '7', guests: '2' });
+    expect(router.currentRoute.value.query.room).toBe(String(hotel.rooms[0]?.id));
+    expect(router.currentRoute.value.query.checkIn).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
   it('shows an empty state, and server validation errors', async () => {

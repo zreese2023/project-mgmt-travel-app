@@ -488,33 +488,41 @@ export async function addItem(
   tripId: number,
   input: NewItemInput,
 ): Promise<ItineraryItem> {
-  return withTransaction(pool, async (db) => {
-    const trip = await loadOwnedTrip(db, userId, tripId);
-    await assertUnpaid(db, tripId, PAID_TRIP_LOCKED);
-    const item = await resolveItem(db, trip, input);
-    const { rows } = await db.query<ItemRow>(
-      `insert into itinerary_items (trip_id, kind, title, day, start_time, notes, activity_id, flight_id, hotel_id)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning ${ITEM_COLUMNS}`,
-      [
-        tripId,
-        item.kind,
-        item.title,
-        item.day,
-        item.startTime,
-        item.notes,
-        item.activityId,
-        item.flightId,
-        item.hotelId,
-      ],
-    );
-    const created = rows[0] as ItemRow;
-    await placeInDay(db, tripId, created.id, item.day, item.startTime);
-    const { rows: fresh } = await db.query<ItemRow>(
-      `select ${ITEM_COLUMNS} from itinerary_items where id = $1`,
-      [created.id],
-    );
-    return toItem(fresh[0] as ItemRow);
-  });
+  return withTransaction(pool, (db) => addItemTx(db, userId, tripId, input));
+}
+
+/** `addItem` inside the caller's transaction, so checkout can store booking details atomically. */
+export async function addItemTx(
+  db: Queryable,
+  userId: number,
+  tripId: number,
+  input: NewItemInput,
+): Promise<ItineraryItem> {
+  const trip = await loadOwnedTrip(db, userId, tripId);
+  await assertUnpaid(db, tripId, PAID_TRIP_LOCKED);
+  const item = await resolveItem(db, trip, input);
+  const { rows } = await db.query<ItemRow>(
+    `insert into itinerary_items (trip_id, kind, title, day, start_time, notes, activity_id, flight_id, hotel_id)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning ${ITEM_COLUMNS}`,
+    [
+      tripId,
+      item.kind,
+      item.title,
+      item.day,
+      item.startTime,
+      item.notes,
+      item.activityId,
+      item.flightId,
+      item.hotelId,
+    ],
+  );
+  const created = rows[0] as ItemRow;
+  await placeInDay(db, tripId, created.id, item.day, item.startTime);
+  const { rows: fresh } = await db.query<ItemRow>(
+    `select ${ITEM_COLUMNS} from itinerary_items where id = $1`,
+    [created.id],
+  );
+  return toItem(fresh[0] as ItemRow);
 }
 
 /** Edits an item's title, notes, day or time; a changed day or time re-places it in the day. */
